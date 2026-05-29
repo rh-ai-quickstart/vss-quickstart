@@ -49,7 +49,7 @@ MLflow observability is included out of the box. Every video summarization reque
 
 ### Architecture diagrams
 
-![VSS architecture showing video ingestion, VLM captioning, CA-RAG retrieval, and LLM summarization](docs/images/vss_architecture.png)
+![VSS architecture showing video ingestion, VLM captioning, CA-RAG retrieval, and LLM summarization](deploy/images/vss_architecture.png)
 
 Video is decoded into chunks by the VSS pipeline pod. Each chunk is captioned by the Cosmos VLM and indexed into Milvus (vector search), ArangoDB, and Neo4j (graph databases). User queries flow through embedding → vector search → reranking → LLM to return cited summaries. Alerts fire when captions match user-defined keywords.
 
