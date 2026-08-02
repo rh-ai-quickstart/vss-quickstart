@@ -1,0 +1,26 @@
+{{- range $key, $monitor := .Values.nimMetricsMonitors }}
+{{- if $monitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $monitor.name }}
+  namespace: {{ include "uwm.targetNamespace" $ }}
+  labels:
+    {{- include "uwm.labels" $ | nindent 4 }}
+spec:
+  podMetricsEndpoints:
+  {{- range $monitor.podMetricsEndpoints }}
+  - interval: {{ .interval }}
+    path: {{ .path }}
+    {{- if .port }}
+    port: {{ .port }}
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- with $monitor.selector.matchLabels }}
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}

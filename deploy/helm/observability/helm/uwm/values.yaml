@@ -1,0 +1,53 @@
+global:
+  targetNamespace: "vss"
+
+clusterMonitoringConfig:
+  enableUserWorkload: true
+  prometheusK8s:
+    retention: 168h
+    volumeClaimTemplate:
+      spec:
+        storageClassName: nfs-client
+        volumeMode: Filesystem
+        resources:
+          requests:
+            storage: 40Gi
+
+userWorkloadMonitoringConfig:
+  prometheus:
+    logLevel: debug
+    retention: 72h
+    volumeClaimTemplate:
+      spec:
+        storageClassName: nfs-client
+        volumeMode: Filesystem
+        resources:
+          requests:
+            storage: 40Gi
+  alertmanager:
+    enabled: true
+    enableAlertmanagerConfig: true
+
+# NIM model serving metrics — one PodMonitor per model
+nimMetricsMonitors:
+  nemotron:
+    enabled: true
+    name: nim-nemotron-metrics
+    podMetricsEndpoints:
+      - interval: 15s
+        path: /metrics
+        port: h2c
+    selector:
+      matchLabels:
+        app: nvidia-nemotron-nano-9b-v2
+
+  cosmos3:
+    enabled: true
+    name: nim-cosmos3-metrics
+    podMetricsEndpoints:
+      - interval: 15s
+        path: /metrics
+        port: h2c
+    selector:
+      matchLabels:
+        app: nvidia-cosmos3-reasoner

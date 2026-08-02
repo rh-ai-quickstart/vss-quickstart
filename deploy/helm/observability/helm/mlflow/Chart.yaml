@@ -1,0 +1,5 @@
+apiVersion: v2
+name: mlflow
+version: 1.0.0
+description: Standalone MLflow tracking server for VSS pipeline tracing
+type: application

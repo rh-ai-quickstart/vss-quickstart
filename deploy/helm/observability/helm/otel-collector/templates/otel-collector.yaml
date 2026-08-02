@@ -1,0 +1,29 @@
+{{- if .Values.collector.enabled -}}
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ .Values.collector.name }}
+  namespace: {{ include "otel-collector.namespace" . }}
+  labels:
+    {{- include "otel-collector.labels" . | nindent 4 }}
+spec:
+  serviceAccount: {{ include "otel-collector.serviceAccountName" . }}
+  mode: {{ .Values.collector.mode }}
+  upgradeStrategy: {{ .Values.collector.upgradeStrategy }}
+  managementState: {{ .Values.collector.managementState }}
+  {{- if eq .Values.collector.mode "deployment" }}
+  replicas: {{ .Values.collector.replicas }}
+  {{- end }}
+  {{- with .Values.collector.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  observability:
+    {{- with .Values.collector.observability }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  config:
+    {{- with .Values.collector.config }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

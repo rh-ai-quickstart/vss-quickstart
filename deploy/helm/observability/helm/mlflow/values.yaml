@@ -1,0 +1,38 @@
+# MLflow standalone instance configuration
+mlflow:
+  # Name used for all resources (deployment, service, route, PVC)
+  name: vss-mlflow
+
+  # Storage configuration
+  storage:
+    storageClassName: nfs-client
+    accessModes:
+      - ReadWriteOnce
+    size: 20Gi
+
+  # Image configuration
+  image:
+    repository: ghcr.io/mlflow/mlflow
+    tag: v3.0.0
+    pullPolicy: IfNotPresent
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # Service configuration
+  service:
+    port: 5000
+    type: ClusterIP
+
+  # OpenShift Route configuration
+  route:
+    enabled: true
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect

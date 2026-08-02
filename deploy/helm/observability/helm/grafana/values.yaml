@@ -1,0 +1,21 @@
+grafana:
+  adminUser: "admin"
+  adminPassword: "admin"
+  logLevel: "warn"
+  namespace: "observability-hub"
+  # Set to your OpenShift cluster's route domain
+  # Get with: oc get ingresses.config/cluster -o jsonpath='{.spec.domain}'
+  clusterDomain: ""
+
+datasources:
+  prometheus:
+    enabled: true
+    url: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+    isDefault: true
+
+dashboards:
+  nimMetrics:
+    enabled: true
+
+serviceAccount:
+  tokenSecretName: "grafana-sa-token"

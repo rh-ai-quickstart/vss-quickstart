@@ -1,0 +1,6 @@
+apiVersion: v2
+name: grafana
+description: Grafana instance with Prometheus datasource for VSS observability
+type: application
+version: 1.0.0
+appVersion: "latest"

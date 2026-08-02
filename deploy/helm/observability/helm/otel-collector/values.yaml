@@ -1,0 +1,88 @@
+global:
+  namespace: observability-hub
+  # VSS application namespace — used to build scrape target FQDNs
+  vssNamespace: vss
+
+serviceAccount:
+  create: true
+  name: "otel-collector"
+
+rbac:
+  create: true
+
+collector:
+  enabled: true
+  name: "otel-collector"
+  mode: deployment
+  upgradeStrategy: automatic
+  managementState: managed
+  replicas: 1
+  resources: {}
+
+  observability:
+    metrics:
+      enableMetrics: true
+
+  config:
+    exporters:
+      debug:
+        verbosity: basic
+
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: nim-nemotron-metrics
+              scrape_interval: 15s
+              static_configs:
+                - targets:
+                    - 'nvidia-nemotron-nano-9b-v2.vss.svc.cluster.local:8000'
+            - job_name: nim-cosmos3-metrics
+              scrape_interval: 15s
+              static_configs:
+                - targets:
+                    - 'nvidia-cosmos3-reasoner.vss.svc.cluster.local:8000'
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        send_batch_size: 100
+        timeout: 1s
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 95
+        spike_limit_percentage: 25
+
+    service:
+      pipelines:
+        metrics:
+          receivers:
+            - otlp
+            - prometheus
+          processors:
+            - batch
+            - memory_limiter
+          exporters:
+            - debug
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - batch
+            - memory_limiter
+          exporters:
+            - debug
+      telemetry:
+        metrics:
+          level: basic
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 0.0.0.0
+                    port: 8888

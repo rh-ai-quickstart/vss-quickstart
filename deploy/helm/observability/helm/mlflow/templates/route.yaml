@@ -1,0 +1,18 @@
+{{- if .Values.mlflow.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Values.mlflow.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.mlflow.name }}
+spec:
+  to:
+    kind: Service
+    name: {{ .Values.mlflow.name }}
+  port:
+    targetPort: http
+  tls:
+    termination: {{ .Values.mlflow.route.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.mlflow.route.tls.insecureEdgeTerminationPolicy }}
+{{- end }}
