@@ -1,0 +1,184 @@
+{{- if and .Values.global.openshift.enabled .Values.openshift.ai.useKserve }}
+# =====================================================================
+# KServe model serving — alternative to NIM Operator CRDs.
+# Gate: openshift.ai.useKserve=true  AND  nims.enabled=false
+# (set nims.enabled=false in values-openshift.yaml to avoid conflict)
+#
+# Creates InferenceService + ServingRuntime + model-download Job + PVC
+# for each enabled model in openshift.ai.kserveModels.
+# =====================================================================
+
+{{- range $name, $model := .Values.openshift.ai.kserveModels }}
+{{- if $model.enabled }}
+# ---------------------------------------------------------------
+# {{ $name }} — PVC for model weights
+# ---------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-pvc
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $model.storage | default "50Gi" }}
+---
+# ---------------------------------------------------------------
+# {{ $name }} — model download Job
+# ---------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: download-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      {{- if $.Values.openshift.serviceAccount.name }}
+      serviceAccountName: {{ $.Values.openshift.serviceAccount.name }}
+      {{- end }}
+      containers:
+      - name: downloader
+        image: {{ $model.downloadImage | default "registry.redhat.io/ubi9/python-311" }}
+        {{- if $model.downloadCommand }}
+        command:
+        - /bin/sh
+        - -c
+        - {{ $model.downloadCommand | quote }}
+        {{- else }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          python3 -c "
+          import os
+          try:
+              from huggingface_hub import snapshot_download
+          except ImportError:
+              import subprocess
+              subprocess.check_call(['pip', 'install', '--quiet', 'huggingface_hub'])
+              from huggingface_hub import snapshot_download
+
+          repo_id = '{{ $model.repoId }}'
+          local_dir = '/mnt/pvc'
+          token = os.getenv('HF_TOKEN')
+
+          print(f'Starting download for {repo_id}...')
+          snapshot_download(
+              repo_id=repo_id,
+              local_dir=local_dir,
+              token=token,
+              local_dir_use_symlinks=False
+          )
+          print(f'Success! Weights downloaded to {local_dir}')
+          "
+        {{- end }}
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $model.hfTokenSecret | default "hf-token-secret" }}
+              key: {{ $model.hfTokenKey | default "HF_TOKEN" }}
+              optional: true
+        - name: NGC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ $model.ngcApiSecret | default "ngc-api-key-secret" }}
+              key: {{ $model.ngcApiKey | default "NGC_API_KEY" }}
+              optional: true
+        volumeMounts:
+        - name: model-volume
+          mountPath: /mnt/pvc
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+      restartPolicy: Never
+      volumes:
+      - name: model-volume
+        persistentVolumeClaim:
+          claimName: {{ $name }}-pvc
+---
+# ---------------------------------------------------------------
+# {{ $name }} — ServingRuntime (vLLM)
+# ---------------------------------------------------------------
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    openshift.io/display-name: {{ $name }}
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8080"
+  containers:
+  - name: kserve-container
+    image: {{ $model.runtimeImage | default "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest" }}
+    command:
+    - python
+    - -m
+    - vllm.entrypoints.openai.api_server
+    args:
+    {{- range $model.vllmArgs }}
+    - {{ . | quote }}
+    {{- end }}
+    env:
+    - name: HF_HUB_OFFLINE
+      value: "1"
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+  multiModel: false
+  supportedModelFormats:
+  - autoSelect: true
+    name: vLLM
+---
+# ---------------------------------------------------------------
+# {{ $name }} — InferenceService
+# ---------------------------------------------------------------
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+    security.opendatahub.io/enable-auth: "false"
+    openshift.io/display-name: {{ $name }}
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    networking.kserve.io/visibility: exposed
+    opendatahub.io/dashboard: "true"
+spec:
+  predictor:
+    maxReplicas: {{ $model.maxReplicas | default 1 }}
+    minReplicas: {{ $model.minReplicas | default 1 }}
+    {{- if $.Values.openshift.gpuTolerations }}
+    tolerations:
+      {{- toYaml $.Values.openshift.gpuTolerations | nindent 6 }}
+    {{- end }}
+    model:
+      modelFormat:
+        name: vLLM
+      name: ""
+      resources:
+        {{- toYaml $model.resources | nindent 8 }}
+      runtime: {{ $name }}
+      storageUri: pvc://{{ $name }}-pvc/
+---
+{{- end }}
+{{- end }}
+{{- end }}

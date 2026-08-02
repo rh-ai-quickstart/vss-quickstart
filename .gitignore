@@ -1,3 +1,6 @@
 .env
 **/.env
-/deploy/helm/nvidia-blueprint-vss
+
+# Helm dependency build artifacts
+deploy/helm/developer-profiles/*/charts/*.tgz
+deploy/helm/developer-profiles/*/Chart.lock
