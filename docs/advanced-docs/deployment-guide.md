@@ -84,12 +84,11 @@ Uses NVIDIA NIM Operator CRDs (`NIMCache`, `NIMService`). The NIM Operator manag
 
 ### KServe (RHOAI: `useKserve: true`)
 
-Uses KServe `InferenceService` + `ServingRuntime` resources managed by Red Hat OpenShift AI. The `openshift-ai.yaml` template creates four resources per enabled model:
+Uses KServe `LLMInferenceService` resources (`serving.kserve.io/v1alpha2`) managed by Red Hat OpenShift AI. The `openshift-ai.yaml` template creates three resources per enabled model:
 
 1. **PVC** — persistent storage for model weights
-2. **Job** — downloads model weights from NGC into the PVC
-3. **ServingRuntime** — defines the NIM container spec
-4. **InferenceService** — creates the model serving endpoint
+2. **Job** — downloads model weights from HuggingFace/NGC into the PVC
+3. **LLMInferenceService** — defines the container spec and model serving endpoint in a single resource
 
 Models are configured in the `openshift.ai.kserveModels` map:
 
@@ -100,25 +99,29 @@ openshift:
     kserveModels:
       nemotron:
         enabled: true
-        modelName: nemotron-nano-9b-v2
-        image: nvcr.io/nim/nvidia/nemotron-nano-9b-v2:latest
-        storageSize: 50Gi
+        repoId: nvidia/Nemotron-Nano-9B-v2
+        storage: 50Gi
+        runtimeImage: "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest"
+        vllmArgs:
+          - "--gpu-memory-utilization"
+          - "0.90"
+          - "--max-model-len"
+          - "16384"
+          - "--trust-remote-code"
         resources:
           limits:
+            cpu: "12"
+            memory: 48Gi
             nvidia.com/gpu: "1"
-      cosmos3:
-        enabled: true
-        modelName: cosmos3-reasoner
-        image: nvcr.io/nim/nvidia/cosmos3-reasoner:latest
-        storageSize: 100Gi
-        resources:
-          limits:
+          requests:
+            cpu: "4"
+            memory: 24Gi
             nvidia.com/gpu: "1"
 ```
 
 The template is data-driven — adding or removing a model only requires editing this map. No template changes needed.
 
-**When to use:** Your cluster uses RHOAI for model serving and you want InferenceServices managed alongside other RHOAI workloads.
+**When to use:** Your cluster uses RHOAI for model serving and you want LLMInferenceServices managed alongside other RHOAI workloads.
 
 ---
 

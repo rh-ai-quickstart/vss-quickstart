@@ -1,0 +1,44 @@
+# NGC Cloud Inference — deploy without local GPUs
+#
+# Points the VSS agent at NGC-hosted NIM endpoints instead of deploying
+# NIM models on-cluster. Requires only an NGC API key with NIM access.
+#
+# Usage:
+#   helm dependency build deploy/helm/developer-profiles/dev-profile-base/
+#
+#   helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
+#     -n vss --create-namespace \
+#     -f deploy/helm/developer-profiles/dev-profile-base/values-openshift.yaml \
+#     -f deploy/helm/developer-profiles/dev-profile-base/values-ngc.yaml \
+#     --set-string ngc.apiKey="$NGC_API_KEY" \
+#     --set global.externalHost=vss.${APPS_DOMAIN}
+
+# Disable on-cluster NIM model serving (no GPU pods needed for inference)
+nims:
+  nemotron:
+    enabled: false
+  cosmos:
+    enabled: false
+  cosmos3:
+    enabled: false
+
+# Disable KServe model serving
+openshift:
+  ai:
+    useKserve: false
+
+# Point agent to NGC cloud endpoints
+global:
+  llmBaseUrl: "https://integrate.api.nvidia.com/v1"
+  vlmBaseUrl: "https://integrate.api.nvidia.com/v1"
+  llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
+  vlmName: "nvidia/cosmos3-nano-reasoner"
+
+# Pass NGC API key to the agent for cloud inference auth
+agent:
+  vss-agent:
+    extraEnv:
+      - name: NVIDIA_API_KEY
+        value: "SET_VIA_HELM_SET"
+      - name: OPENAI_API_KEY
+        value: "SET_VIA_HELM_SET"

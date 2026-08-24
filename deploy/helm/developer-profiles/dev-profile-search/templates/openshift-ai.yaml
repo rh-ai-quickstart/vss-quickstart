@@ -2,9 +2,8 @@
 # =====================================================================
 # KServe model serving — alternative to NIM Operator CRDs.
 # Gate: openshift.ai.useKserve=true  AND  nims.enabled=false
-# (set nims.enabled=false in values-openshift.yaml to avoid conflict)
 #
-# Creates InferenceService + ServingRuntime + model-download Job + PVC
+# Creates LLMInferenceService + model-download Job + PVC
 # for each enabled model in openshift.ai.kserveModels.
 # =====================================================================
 
@@ -41,7 +40,7 @@ spec:
   backoffLimit: 3
   template:
     spec:
-      {{- if $.Values.openshift.serviceAccount.name }}
+      {{- if and $.Values.openshift.serviceAccount $.Values.openshift.serviceAccount.name }}
       serviceAccountName: {{ $.Values.openshift.serviceAccount.name }}
       {{- end }}
       containers:
@@ -110,74 +109,56 @@ spec:
           claimName: {{ $name }}-pvc
 ---
 # ---------------------------------------------------------------
-# {{ $name }} — ServingRuntime (vLLM)
+# {{ $name }} — LLMInferenceService (serving.kserve.io/v1alpha2)
+# Replaces the old ServingRuntime + InferenceService pair.
+# Container spec is inline; model weights via PVC.
 # ---------------------------------------------------------------
-apiVersion: serving.kserve.io/v1alpha1
-kind: ServingRuntime
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
 metadata:
   name: {{ $name }}
   namespace: {{ $.Release.Namespace }}
   annotations:
-    openshift.io/display-name: {{ $name }}
-  labels:
-    opendatahub.io/dashboard: "true"
-spec:
-  annotations:
-    prometheus.io/path: /metrics
-    prometheus.io/port: "8080"
-  containers:
-  - name: kserve-container
-    image: {{ $model.runtimeImage | default "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest" }}
-    command:
-    - python
-    - -m
-    - vllm.entrypoints.openai.api_server
-    args:
-    {{- range $model.vllmArgs }}
-    - {{ . | quote }}
-    {{- end }}
-    env:
-    - name: HF_HUB_OFFLINE
-      value: "1"
-    ports:
-    - containerPort: 8080
-      protocol: TCP
-  multiModel: false
-  supportedModelFormats:
-  - autoSelect: true
-    name: vLLM
----
-# ---------------------------------------------------------------
-# {{ $name }} — InferenceService
-# ---------------------------------------------------------------
-apiVersion: serving.kserve.io/v1beta1
-kind: InferenceService
-metadata:
-  annotations:
-    serving.kserve.io/deploymentMode: RawDeployment
     security.opendatahub.io/enable-auth: "false"
     openshift.io/display-name: {{ $name }}
-  name: {{ $name }}
-  namespace: {{ $.Release.Namespace }}
   labels:
     networking.kserve.io/visibility: exposed
     opendatahub.io/dashboard: "true"
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
 spec:
-  predictor:
-    maxReplicas: {{ $model.maxReplicas | default 1 }}
-    minReplicas: {{ $model.minReplicas | default 1 }}
+  model:
+    uri: pvc://{{ $name }}-pvc/
+  replicas: {{ $model.minReplicas | default 1 }}
+  storageInitializer:
+    enabled: false
+  template:
+    containers:
+    - name: kserve-container
+      image: {{ $model.runtimeImage | default "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest" }}
+      command:
+      - python
+      - -m
+      - vllm.entrypoints.openai.api_server
+      args:
+      {{- range $model.vllmArgs }}
+      - {{ . | quote }}
+      {{- end }}
+      env:
+      - name: HF_HUB_OFFLINE
+        value: "1"
+      ports:
+      - containerPort: 8080
+        protocol: TCP
+      resources:
+        {{- toYaml $model.resources | nindent 8 }}
     {{- if $.Values.openshift.gpuTolerations }}
     tolerations:
       {{- toYaml $.Values.openshift.gpuTolerations | nindent 6 }}
     {{- end }}
-    model:
-      modelFormat:
-        name: vLLM
-      name: ""
-      resources:
-        {{- toYaml $model.resources | nindent 8 }}
-      runtime: {{ $name }}
-      storageUri: pvc://{{ $name }}-pvc/
+    {{- if $.Values.global.imagePullSecrets }}
+    imagePullSecrets:
+      {{- toYaml $.Values.global.imagePullSecrets | nindent 6 }}
+    {{- end }}
 ---
 {{- end }}
 {{- end }}

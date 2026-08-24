@@ -18,7 +18,7 @@ Built the foundation for OpenShift deployment on top of the upstream v2.4.1 char
 |------|-------------|
 | `deploy/helm/values-openshift.yaml` | Initial OpenShift values overlay (162 lines) — NGC secrets via `nvcf` mechanism, `openshift.enabled` flag, SA/SCC/Route config, GPU tolerations |
 | `deploy/helm/openshift-deployment.md` | Initial deployment runbook (572 lines) — prerequisites, deployment steps, OpenShift-specific challenges |
-| Chart `.tgz` modifications | Added `templates/openshift.yaml` (SA, SCC RoleBinding, Route, service secrets) and `templates/openshift-ai.yaml` (KServe InferenceService + ServingRuntime) inside the packaged chart |
+| Chart `.tgz` modifications | Added `templates/openshift.yaml` (SA, SCC RoleBinding, Route, service secrets) and `templates/openshift-ai.yaml` (KServe model serving) inside the packaged chart |
 | Docker Compose configs | Added `otel-collector-config.yaml` and `prometheus.yml` to all 4 compose variants |
 
 ### Phase 2 — MLflow, KServe/MIG, Branding, Documentation
@@ -36,7 +36,7 @@ Extended the OpenShift integration with observability, production-grade model se
 #### KServe Model Serving with MIG GPU Scheduling
 | File | Description |
 |------|-------------|
-| `deploy/helm/is-sr.yaml` | 378 lines — Authoritative KServe InferenceService + ServingRuntime definitions for 4 models (llama-rerank, embedqa, cosmos, llama3-8b) with MIG-specific GPU resources (`mig-7g.94gb`, `mig-3g.47gb`, `mig-2g.24gb`, `mig-1g.12gb`) |
+| `deploy/helm/is-sr.yaml` | 378 lines — Legacy KServe InferenceService + ServingRuntime definitions for 4 models (llama-rerank, embedqa, cosmos, llama3-8b) with MIG-specific GPU resources. Superseded by LLMInferenceService in v3.2.1 templates |
 | `deploy/helm/job-pvc.yaml` | 242 lines — Model download Jobs (HuggingFace `snapshot_download` and modelcar copy) + PVCs for each model |
 | `generate_template.sh` | Concatenates `is-sr.yaml` + `job-pvc.yaml` into a Helm template wrapped in `{{- if .Values.openshift.ai.enabled }}` |
 | `deploy/helm/values-openshift.yaml` | Expanded from 162→216 lines: added MIG resource requests, KServe predictor endpoints, CA-RAG config pointing to KServe services, init containers for dependency checks, MLflow env vars, volume mounts for patches and branding |
@@ -82,7 +82,7 @@ The upstream chart was completely restructured between v2.4.1 and v3.2.1. This t
 ### KServe Model Serving (our addition, not in fork)
 | Custom Work | v3.2.1 Location | Status |
 |-------------|-----------------|--------|
-| KServe InferenceService + ServingRuntime | `developer-profiles/*/templates/openshift-ai.yaml` | Ported to all 4 profiles (data-driven via `openshift.ai.kserveModels`) |
+| KServe LLMInferenceService (serving.kserve.io/v1alpha2) | `developer-profiles/*/templates/openshift-ai.yaml` | Ported to all 4 profiles (data-driven via `openshift.ai.kserveModels`) |
 | Model download Jobs + PVCs | `developer-profiles/*/templates/openshift-ai.yaml` | Integrated into template loop |
 | KServe model config | Per-profile `values-openshift.yaml` under `openshift.ai` | Complete — nemotron + cosmos3 |
 | MIG GPU resource requests | Per-profile `values-openshift.yaml` | TODO — needs MIG profiles for new models |

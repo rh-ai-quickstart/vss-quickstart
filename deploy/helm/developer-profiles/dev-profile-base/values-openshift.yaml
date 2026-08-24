@@ -78,7 +78,7 @@ rtvi:
 
 # -- KServe model serving (alternative to NIM Operator) ----------------------
 # When useKserve is true, templates/openshift-ai.yaml renders
-# InferenceService + ServingRuntime + model-download Job + PVC
+# LLMInferenceService + model-download Job + PVC
 # for each model listed below. Also set nims.enabled: false.
 openshift:
   ai:
