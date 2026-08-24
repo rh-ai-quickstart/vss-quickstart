@@ -66,15 +66,33 @@ vios:
             topologyKey: kubernetes.io/hostname
   vss-vios-streamprocessing:
     tolerations: *gpu-tolerations
+    # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
+    # resources:
+    #   limits:
+    #     nvidia.com/mig-2g.24gb: 1
+    #   requests:
+    #     nvidia.com/mig-2g.24gb: 1
 
 # -- RTVI: null security contexts for restricted-v2 SCC ----------------------
 rtvi:
   rtvi-embed:
     podSecurityContext: null
     securityContext: null
+    # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
+    # resources:
+    #   limits:
+    #     nvidia.com/mig-1g.12gb: 1
+    #   requests:
+    #     nvidia.com/mig-1g.12gb: 1
   rtvi-vlm:
     securityContext: null
     tolerations: *gpu-tolerations
+    # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
+    # resources:
+    #   limits:
+    #     nvidia.com/mig-2g.24gb: 1
+    #   requests:
+    #     nvidia.com/mig-2g.24gb: 1
 
 # -- KServe model serving (alternative to NIM Operator) ----------------------
 # When useKserve is true, templates/openshift-ai.yaml renders
@@ -100,10 +118,13 @@ openshift:
             cpu: "12"
             memory: 48Gi
             nvidia.com/gpu: "1"
+            # -- MIG: replace nvidia.com/gpu with MIG slice (~25GB model fits 3g.47gb)
+            # nvidia.com/mig-3g.47gb: "1"
           requests:
             cpu: "4"
             memory: 24Gi
             nvidia.com/gpu: "1"
+            # nvidia.com/mig-3g.47gb: "1"
       cosmos3:
         enabled: true
         repoId: nvidia/cosmos3-reasoner
@@ -115,13 +136,19 @@ openshift:
           - "--max-model-len"
           - "28000"
           - "--trust-remote-code"
+          # -- MIG: uncomment for tensor parallelism across 2x 3g.47gb slices
+          # - "--tensor-parallel-size"
+          # - "2"
         resources:
           limits:
             cpu: "12"
             memory: 96Gi
             nvidia.com/gpu: "1"
+            # -- MIG: replace nvidia.com/gpu with 2x 3g.47gb slices + tensor parallelism
+            # nvidia.com/mig-3g.47gb: "2"
           requests:
             cpu: "4"
             memory: 48Gi
             nvidia.com/gpu: "1"
+            # nvidia.com/mig-3g.47gb: "2"
   gpuTolerations: *gpu-tolerations
