@@ -144,6 +144,14 @@ Which developer profile?
 └── dev-profile-lvs     — + live video streaming
 ```
 
+Build the chart dependencies for your chosen profile (the developer-profile charts reference service charts via local `file://` paths that Helm must resolve before install):
+
+```bash
+helm dependency build deploy/helm/developer-profiles/dev-profile-base/
+```
+
+Then install:
+
 ```bash
 export APPS_DOMAIN=$(oc get ingress.config.openshift.io/cluster \
   -o jsonpath='{.spec.domain}')
