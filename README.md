@@ -179,6 +179,8 @@ helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
   --set global.externalHost=vss.${APPS_DOMAIN}
 ```
 
+> `ngc.apiKey` backs the image-pull and NIM secrets; the two `extraEnv` overrides populate the agent's `NVIDIA_API_KEY` / `OPENAI_API_KEY` for cloud inference auth (they default to a placeholder in `values-ngc.yaml` so no real key is committed). All three are required for Option A.
+
 **Outbound TLS trust (handled automatically).** The `vss-agent` calls NGC cloud over HTTPS (`https://integrate.api.nvidia.com`). On OpenShift the agent image ships only a minimal CA store, so without a cluster trust bundle these calls fail with `unable to get local issuer certificate` (and downstream LLM/VLM tool errors). `values-openshift.yaml` handles this for you via `global.openshift.trustedCA`:
 
 - `templates/openshift-trusted-ca.yaml` creates a ConfigMap (`vss-combined-ca`) labeled `config.openshift.io/inject-trusted-cabundle: "true"`. The OpenShift Cluster Network Operator populates its `ca-bundle.crt` with the full public-root + `user-ca-bundle` trust store (this also covers a corporate egress proxy that MITMs TLS).

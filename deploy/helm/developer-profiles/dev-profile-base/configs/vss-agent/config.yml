@@ -53,7 +53,8 @@ functions:
     _type: video_understanding
     vlm_name: ${VLM_MODEL_TYPE:-nim}_vlm # e.g. nim_vlm, openai_vlm
     # Frames sampled evenly across the requested clip. On-cluster (Cosmos) default 30;
-    # NGC serverless VLM caps a prompt at 10 images, so values-ngc.yaml sets VIDEO_MAX_FRAMES=10.
+    # NGC serverless VLM caps a prompt at 10 images and frame_select emits num_frames+1,
+    # so values-ngc.yaml sets VIDEO_MAX_FRAMES=9 (-> 10 images).
     max_frames: ${VIDEO_MAX_FRAMES:-30}
     max_fps: 2  # for CR1, max fps is 2
     min_pixels: 3136

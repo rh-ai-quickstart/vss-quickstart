@@ -57,7 +57,8 @@ agent:
       # (video_understanding frame_select). On-cluster paths decode on GPU and keep this false.
       - name: INSTALL_PROPRIETARY_CODECS
         value: "true"
-      # NGC serverless VLM rejects prompts with >10 images. Cap frames sampled per
-      # video_understanding call at 10 (config.yml reads ${VIDEO_MAX_FRAMES:-30}).
+      # NGC serverless VLM rejects prompts with >10 images. frame_select samples an
+      # inclusive range from 0, so num_frames=N yields N+1 images -- cap at 9 to stay
+      # within the 10-image limit (config.yml reads ${VIDEO_MAX_FRAMES:-30}).
       - name: VIDEO_MAX_FRAMES
-        value: "10"
+        value: "9"
