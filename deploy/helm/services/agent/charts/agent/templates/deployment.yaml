@@ -123,42 +123,46 @@ spec:
             {{- end }}
           env:
             {{- /*
-              Option B: container env is the explicit list `env` (each value may use Helm `tpl` with .Values / .Release).
-              `extraEnv` is appended last (duplicate names: last wins). No envOverrides layer.
+              Collect env, video-ingest timeouts, trusted-CA vars, and extraEnv into $pairs,
+              then render deduped by name (last wins). Duplicate names break `helm upgrade`:
+              the strategic-merge patch's $setElementOrder can't list a merge key twice.
             */}}
+            {{- $pairs := list }}
             {{- range .Values.env }}
-            - name: {{ .name }}
-              value: {{ tpl (.value | default "" | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" .name "value" (tpl (.value | default "" | toString) $)) }}
             {{- end }}
             {{- $videoIngestTimeouts := .Values.videoIngestTimeouts | default dict }}
             {{- with get $videoIngestTimeouts "vstUploadTimeoutSeconds" }}
-            - name: VIDEO_INGEST_VST_UPLOAD_TIMEOUT_SECONDS
-              value: {{ tpl (. | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" "VIDEO_INGEST_VST_UPLOAD_TIMEOUT_SECONDS" "value" (tpl (. | toString) $)) }}
             {{- end }}
             {{- with get $videoIngestTimeouts "vstStorageTimeoutSeconds" }}
-            - name: VIDEO_INGEST_VST_STORAGE_TIMEOUT_SECONDS
-              value: {{ tpl (. | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" "VIDEO_INGEST_VST_STORAGE_TIMEOUT_SECONDS" "value" (tpl (. | toString) $)) }}
             {{- end }}
             {{- with get $videoIngestTimeouts "rtviCvTimeoutSeconds" }}
-            - name: VIDEO_INGEST_RTVI_CV_TIMEOUT_SECONDS
-              value: {{ tpl (. | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" "VIDEO_INGEST_RTVI_CV_TIMEOUT_SECONDS" "value" (tpl (. | toString) $)) }}
             {{- end }}
             {{- with get $videoIngestTimeouts "rtviEmbedTimeoutSeconds" }}
-            - name: VIDEO_INGEST_RTVI_EMBED_TIMEOUT_SECONDS
-              value: {{ tpl (. | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" "VIDEO_INGEST_RTVI_EMBED_TIMEOUT_SECONDS" "value" (tpl (. | toString) $)) }}
             {{- end }}
             {{- if $trustOn }}
             {{- /* Point OpenSSL, requests, and curl at the injected trust bundle so outbound TLS (e.g. NGC cloud) verifies. */}}
-            - name: SSL_CERT_FILE
-              value: {{ $trustFile | quote }}
-            - name: REQUESTS_CA_BUNDLE
-              value: {{ $trustFile | quote }}
-            - name: CURL_CA_BUNDLE
-              value: {{ $trustFile | quote }}
+            {{- $pairs = append $pairs (dict "name" "SSL_CERT_FILE" "value" $trustFile) }}
+            {{- $pairs = append $pairs (dict "name" "REQUESTS_CA_BUNDLE" "value" $trustFile) }}
+            {{- $pairs = append $pairs (dict "name" "CURL_CA_BUNDLE" "value" $trustFile) }}
             {{- end }}
             {{- range (.Values.extraEnv | default list) }}
-            - name: {{ .name }}
-              value: {{ tpl (.value | default "" | toString) $ | quote }}
+            {{- $pairs = append $pairs (dict "name" .name "value" (tpl (.value | default "" | toString) $)) }}
+            {{- end }}
+            {{- /* Dedupe by name (last definition wins), preserving first-seen order. */}}
+            {{- $byName := dict }}
+            {{- $order := list }}
+            {{- range $pairs }}
+            {{- if not (hasKey $byName .name) }}{{- $order = append $order .name }}{{- end }}
+            {{- $_ := set $byName .name .value }}
+            {{- end }}
+            {{- range $order }}
+            - name: {{ . }}
+              value: {{ get $byName . | quote }}
             {{- end }}
           {{- with .Values.startupProbe }}
           startupProbe:
