@@ -53,3 +53,11 @@ agent:
         value: "SET_VIA_HELM_SET"
       - name: OPENAI_API_KEY
         value: "SET_VIA_HELM_SET"
+      # NGC cloud = remote VLM, so the agent downloads + OpenCV-decodes MP4s locally
+      # (video_understanding frame_select). On-cluster paths decode on GPU and keep this false.
+      - name: INSTALL_PROPRIETARY_CODECS
+        value: "true"
+      # NGC serverless VLM rejects prompts with >10 images. Cap frames sampled per
+      # video_understanding call at 10 (config.yml reads ${VIDEO_MAX_FRAMES:-30}).
+      - name: VIDEO_MAX_FRAMES
+        value: "10"
