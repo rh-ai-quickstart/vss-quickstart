@@ -144,15 +144,13 @@ export APPS_DOMAIN=$(oc get ingress.config.openshift.io/cluster \
 oc new-project vss
 ```
 
-5. Pick a developer profile based on the capabilities you need:
+5. This quickstart ships the **`dev-profile-base`** developer profile — the core VSS pipeline (VLM captioning, LLM summary/chat, agent + UI) validated on OpenShift AI:
 
 ```
-Which developer profile?
-├── dev-profile-base    — Core pipeline + NIM models (recommended starting point)
-├── dev-profile-alerts  — + alert capabilities
-├── dev-profile-search  — + search capabilities
-└── dev-profile-lvs     — + live video streaming
+dev-profile-base — Core pipeline + NIM models (LLM + VLM)
 ```
+
+> Additional profiles from the upstream blueprint — `dev-profile-alerts` (alerting), `dev-profile-search` (search/RAG), and `dev-profile-lvs` (long-video summarization) — are retained in the `upstream/vss` submodule.
 
 6. Build chart dependencies (required before first install — the developer-profile charts reference service charts via local `file://` paths that Helm must resolve):
 
