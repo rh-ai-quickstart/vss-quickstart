@@ -20,6 +20,15 @@
 global:
   openshift:
     enabled: true
+    # -- Outbound TLS trust bundle -------------------------------------------
+    # Creates an OpenShift-injected CA ConfigMap (templates/openshift-trusted-ca.yaml)
+    # and mounts it into vss-agent so egress TLS to NGC cloud
+    # (https://integrate.api.nvidia.com) and any corporate egress proxy verifies.
+    # Without this the agent fails with "unable to get local issuer certificate".
+    # The Cluster Network Operator populates the ca-bundle.crt key.
+    trustedCA:
+      enabled: true
+      configMapName: vss-combined-ca
   externalScheme: "https"
   imagePullSecrets:
     - name: ngc-secret
@@ -69,8 +78,10 @@ vios:
     # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
     # resources:
     #   limits:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
     #   requests:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
 
 # -- RTVI: null security contexts for restricted-v2 SCC ----------------------
@@ -81,8 +92,10 @@ rtvi:
     # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
     # resources:
     #   limits:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-1g.12gb: 1
     #   requests:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-1g.12gb: 1
   rtvi-vlm:
     securityContext: null
@@ -90,8 +103,10 @@ rtvi:
     # -- MIG: uncomment to request a specific MIG slice instead of nvidia.com/gpu
     # resources:
     #   limits:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
     #   requests:
+    #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
 
 # -- KServe model serving (alternative to NIM Operator) ----------------------

@@ -130,6 +130,25 @@ waitForDependencies:
   retryInterval: "2"
 
 extraEnv: []
+
+# Mount an OpenShift-injected trusted-CA bundle so the agent trusts outbound
+# TLS endpoints (e.g. NGC cloud https://integrate.api.nvidia.com) and any
+# corporate proxy MITM CA. The referenced ConfigMap must be labeled
+# `config.openshift.io/inject-trusted-cabundle: "true"` so the OpenShift
+# Cluster Network Operator populates its `ca-bundle.crt` key with the full
+# public-root + user-ca-bundle trust store (the umbrella chart's
+# templates/openshift-trusted-ca.yaml creates it). When enabled, the subchart
+# mounts the bundle and sets SSL_CERT_FILE / REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE
+# to point at it — these are set in the `env` block (not `extraEnv`) so they
+# never collide with an `extraEnv` list supplied by an overlay (e.g. the NGC
+# API keys in values-ngc.yaml). If both `enabled` and `configMapName` are unset
+# here, the values fall back to `global.openshift.trustedCA.*`.
+trustedCA:
+  enabled: false
+  configMapName: ""            # e.g. vss-combined-ca
+  key: ca-bundle.crt
+  mountPath: /etc/pki/tls/custom-certs
+
 env:
 - name: VSS_AGENT_CONFIG_FILE
   value: '{{ .Values.configFilePath | default "/etc/vss-agent/config.yml" }}'

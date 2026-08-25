@@ -17,6 +17,16 @@
 {{- $rt := .Values.reportTemplates | default dict }}
 {{- /* Kubernetes rejects `items` keys missing from the ConfigMap; optional:true only helps when the CM itself is absent. */}}
 {{- $mountReportTemplates := and (eq (.Values.profile | default "base") "alerts") ($rt.enabled | default false) }}
+{{- /* Trusted-CA bundle for outbound TLS. Prefer subchart .Values.trustedCA; fall back to global.openshift.trustedCA. */}}
+{{- $g := .Values.global | default dict }}
+{{- $gTrust := (index ($g.openshift | default dict) "trustedCA") | default dict }}
+{{- $trust := .Values.trustedCA | default dict }}
+{{- $trustCM := $trust.configMapName | default ($gTrust.configMapName | default "") }}
+{{- $trustEnabled := $trust.enabled | default ($gTrust.enabled | default false) }}
+{{- $trustKey := $trust.key | default ($gTrust.key | default "ca-bundle.crt") }}
+{{- $trustMount := $trust.mountPath | default ($gTrust.mountPath | default "/etc/pki/tls/custom-certs") }}
+{{- $trustOn := and $trustEnabled (ne $trustCM "") }}
+{{- $trustFile := printf "%s/%s" $trustMount $trustKey }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -106,6 +116,11 @@ spec:
             - name: eval-output
               mountPath: /vss-agent/eval-output
             {{- end }}
+            {{- if $trustOn }}
+            - name: trusted-ca
+              mountPath: {{ $trustMount }}
+              readOnly: true
+            {{- end }}
           env:
             {{- /*
               Option B: container env is the explicit list `env` (each value may use Helm `tpl` with .Values / .Release).
@@ -131,6 +146,15 @@ spec:
             {{- with get $videoIngestTimeouts "rtviEmbedTimeoutSeconds" }}
             - name: VIDEO_INGEST_RTVI_EMBED_TIMEOUT_SECONDS
               value: {{ tpl (. | toString) $ | quote }}
+            {{- end }}
+            {{- if $trustOn }}
+            {{- /* Point OpenSSL, requests, and curl at the injected trust bundle so outbound TLS (e.g. NGC cloud) verifies. */}}
+            - name: SSL_CERT_FILE
+              value: {{ $trustFile | quote }}
+            - name: REQUESTS_CA_BUNDLE
+              value: {{ $trustFile | quote }}
+            - name: CURL_CA_BUNDLE
+              value: {{ $trustFile | quote }}
             {{- end }}
             {{- range (.Values.extraEnv | default list) }}
             - name: {{ .name }}
@@ -167,6 +191,12 @@ spec:
         {{- if .Values.mountEvalOutput }}
         - name: eval-output
           emptyDir: {}
+        {{- end }}
+        {{- if $trustOn }}
+        - name: trusted-ca
+          configMap:
+            name: {{ $trustCM }}
+            optional: true
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

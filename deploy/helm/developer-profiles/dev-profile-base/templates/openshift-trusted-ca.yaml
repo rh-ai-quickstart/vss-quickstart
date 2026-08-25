@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# =====================================================================
+# OpenShift trusted-CA bundle for the vss-agent.
+#
+# On OpenShift, the agent's base image ships only a minimal trust store,
+# so outbound TLS to public endpoints (e.g. NGC cloud
+# https://integrate.api.nvidia.com in NGC / KServe-remote modes) and to
+# any corporate proxy that MITMs egress fails with
+# "unable to get local issuer certificate".
+#
+# This ConfigMap is created empty but labeled so the OpenShift Cluster
+# Network Operator injects the COMPLETE trust store (system public roots
+# + the cluster's user-ca-bundle / additionalTrustBundle) into its
+# `ca-bundle.crt` key. The agent subchart mounts it and points
+# SSL_CERT_FILE / REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE at it (see
+# agent.vss-agent.trustedCA and services/agent/charts/agent).
+#
+# We intentionally do NOT set `data:` — the CNO owns that key, and Helm's
+# 3-way merge leaves CNO-injected content untouched across upgrades.
+# =====================================================================
+{{- $g := .Values.global | default dict }}
+{{- $osEnabled := (index ($g.openshift | default dict) "enabled") | default false }}
+{{- $trust := (index ($g.openshift | default dict) "trustedCA") | default dict }}
+{{- if and $osEnabled ($trust.enabled | default true) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $trust.configMapName | default "vss-combined-ca" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
