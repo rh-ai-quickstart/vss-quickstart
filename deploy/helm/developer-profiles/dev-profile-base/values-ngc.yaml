@@ -29,8 +29,8 @@ openshift:
 
 # Point agent to NGC cloud endpoints
 global:
-  llmBaseUrl: "https://integrate.api.nvidia.com/v1"
-  vlmBaseUrl: "https://integrate.api.nvidia.com/v1"
+  llmBaseUrl: "https://integrate.api.nvidia.com"
+  vlmBaseUrl: "https://integrate.api.nvidia.com"
   llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
   vlmName: "nvidia/cosmos3-nano-reasoner"
 
