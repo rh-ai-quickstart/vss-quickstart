@@ -32,7 +32,18 @@ global:
   llmBaseUrl: "https://integrate.api.nvidia.com"
   vlmBaseUrl: "https://integrate.api.nvidia.com"
   llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
-  vlmName: "nvidia/cosmos3-nano-reasoner"
+  # VLM for NGC cloud (serverless integrate.api.nvidia.com).
+  #
+  # We use nemotron-nano-12b-v2-vl rather than the local-deploy default
+  # (cosmos3-nano-reasoner): the Cosmos-3 family is entitlement-gated on the
+  # serverless endpoint and returns 404 "Not found for account" for a standard
+  # NGC developer key, whereas nemotron-nano-12b-v2-vl is available by default.
+  # The VSS video_understanding tool's remote path samples JPEG frames and sends
+  # them as base64 images (not a video_url), so any image-capable VL model works;
+  # this one accepts image+video input over the OpenAI-compatible chat API and
+  # pairs with the Nemotron LLM above. For on-cluster (KServe/NIM) deploys,
+  # keep Cosmos3-Reasoner — see values-openshift.yaml.
+  vlmName: "nvidia/nemotron-nano-12b-v2-vl"
 
 # Pass NGC API key to the agent for cloud inference auth
 agent:

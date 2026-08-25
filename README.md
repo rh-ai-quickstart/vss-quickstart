@@ -166,6 +166,8 @@ helm dependency build deploy/helm/developer-profiles/dev-profile-base/
 
 Uses NVIDIA-hosted NIM endpoints for LLM and VLM inference. Models run on NGC cloud; only the VSS pipeline services deploy on your cluster. This is the fastest way to evaluate the quickstart without provisioning GPU nodes for model serving.
 
+**Cloud model selection.** `values-ngc.yaml` points the agent at `nvidia/nvidia-nemotron-nano-9b-v2` (LLM) and `nvidia/nemotron-nano-12b-v2-vl` (VLM) on `integrate.api.nvidia.com` — both available to a standard NGC developer key. The VLM differs from the on-cluster default (Cosmos3-Reasoner, used in Options B/C): the Cosmos-3 family is entitlement-gated on the serverless endpoint and returns `404 ... Not found for account` without a serverless entitlement. For remote inference the `video_understanding` tool samples JPEG frames and sends them as images, so any image-capable VL model works. Override with `--set global.vlmName=...` if your key is entitled to a different model.
+
 ```bash
 helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
   -n vss \
