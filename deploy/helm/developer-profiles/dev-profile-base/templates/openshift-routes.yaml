@@ -194,5 +194,10 @@ spec:
     targetPort: {{ $vi.vstIngressPort | default 30888 }}
   tls:
     termination: edge
-    insecureEdgeTerminationPolicy: Redirect
+    # Allow (not Redirect): the vss-agent validates VST-returned video URLs with a
+    # plain-HTTP HEAD (vst_video_clip -> validate_video_url). Redirect would 302 that
+    # request to HTTPS, whose default OpenShift ingress cert is self-signed and not in
+    # the agent's CA bundle -> CERTIFICATE_VERIFY_FAILED. Allow serves /vst over HTTP so
+    # no TLS is traversed; browsers can still use HTTPS. Clips are unauthenticated either way.
+    insecureEdgeTerminationPolicy: Allow
 {{- end }}
