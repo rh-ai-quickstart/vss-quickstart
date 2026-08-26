@@ -6,16 +6,16 @@
 #   export APPS_DOMAIN=$(oc get ingress.config.openshift.io/cluster \
 #   -o jsonpath='{.spec.domain}')
 #
-# Install:
+# Install (KServe on-cluster model serving):
 #   helm install vss . \
 #   -f values-base.yaml \
 #   -f values-openshift.yaml \
 #   --set-string ngc.apiKey="$NGC_CLI_API_KEY" \
+#   --set openshift.ai.useKserve=true \
 #   --set global.externalHost=vss.${APPS_DOMAIN} \
 #   -n vss --create-namespace
 #
-# For KServe mode (RHOAI model serving instead of NIM Operator):
-#   Add: --set openshift.ai.useKserve=true --set nims.enabled=false
+# For NGC cloud inference instead: add -f values-ngc.yaml (omit useKserve).
 
 global:
   openshift:
@@ -42,27 +42,15 @@ ngc:
   createSecrets: true
   apiKey: ""    # set via --set ngc.apiKey=$NGC_API_KEY
 
-# -- NIM model serving (default mode) ----------------------------------------
-nims:
-  global:
-    pullSecretName: ngc-secret
-    authSecretName: ngc-api
-  nemotron:
+# -- VIOS: pod affinity + GPU tolerations ------------------------------------
+# NOTE: vss-vios-sensor defines the &gpu-tolerations anchor reused by all GPU
+# workloads below (agent VLM/RTVI, KServe gpuTolerations).
+vios:
+  vss-vios-sensor:
     tolerations: &gpu-tolerations
       - key: nvidia.com/gpu
         effect: NoSchedule
         operator: Exists
-  cosmos:
-    enabled: true
-    tolerations: *gpu-tolerations
-  cosmos3:
-    enabled: false
-    tolerations: *gpu-tolerations
-
-# -- VIOS: pod affinity + GPU tolerations ------------------------------------
-vios:
-  vss-vios-sensor:
-    tolerations: *gpu-tolerations
     affinity:
       podAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -109,20 +97,43 @@ rtvi:
     #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
 
-# -- KServe model serving (alternative to NIM Operator) ----------------------
-# When useKserve is true, templates/openshift-ai.yaml renders
-# LLMInferenceService + model-download Job + PVC
-# for each model listed below. Also set nims.enabled: false.
+# -- KServe model serving (on-cluster models via RHOAI) ----------------------
+# When useKserve is true, templates/openshift-ai.yaml renders one
+# LLMInferenceService per model below. KServe's storage-initializer pulls
+# the weights straight from model.uri (hf://<repoId> by default) into
+# /mnt/models — no download Job or PVC.
+#
+# Per model:
+#   repoId       HuggingFace repo (org/name) -> hf://<repoId>. Must be a real HF
+#                repo; override the whole URI with `modelUri:` for pvc://, s3://, oci://.
+#   servedName   optional OpenAI-API model id (defaults to repoId).
+#   hfTokenSecret / hfTokenKey  secret + key holding HF_TOKEN for gated repos
+#                (defaults hf-token-secret / HF_TOKEN). Create this secret in the
+#                release namespace before install for any gated model. Both default
+#                models below are public/ungated, so no HF token is required.
+#   runtimeImage vLLM serving image. The LLM uses the Red Hat rhaii vLLM image;
+#                the Cosmos3 VLM requires NVIDIA's cosmos3 vLLM build (see below).
 openshift:
   ai:
     useKserve: false
+    # NOTE: the map key becomes the LLMInferenceService (and its Service) name.
+    # These keys match the vss-agent's default in-cluster endpoints
+    # (http://nvidia-nemotron-nano-9b-v2:8000, http://nvidia-cosmos3-reasoner:8000),
+    # and each servedName matches the agent's default llmName / vlmName — so with
+    # llmBaseUrl / vlmBaseUrl left blank the agent finds these models with no extra
+    # config. If your KServe build exposes the model under a different Service DNS
+    # name or port, set global.llmBaseUrl / global.vlmBaseUrl to the real endpoint.
     kserveModels:
-      nemotron:
+      # -- LLM (summary + chat) -------------------------------------------------
+      nvidia-nemotron-nano-9b-v2:
         enabled: true
-        repoId: nvidia/Nemotron-Nano-9B-v2
-        storage: 50Gi
-        runtimeImage: "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest"
+        repoId: nvidia/NVIDIA-Nemotron-Nano-9B-v2   # public, ungated
+        servedName: nvidia/nvidia-nemotron-nano-9b-v2
+        # modelUri: hf://nvidia/NVIDIA-Nemotron-Nano-9B-v2   # override for pvc://, s3://, oci://
+        runtimeImage: "registry.redhat.io/rhaii/vllm-cuda-rhel9:3.4.0"
         vllmArgs:
+          - "--served-model-name"
+          - "nvidia/nvidia-nemotron-nano-9b-v2"
           - "--gpu-memory-utilization"
           - "0.90"
           - "--max-model-len"
@@ -140,18 +151,33 @@ openshift:
             memory: 24Gi
             nvidia.com/gpu: "1"
             # nvidia.com/mig-3g.47gb: "1"
-      cosmos3:
+      # -- VLM (frame captioning) ----------------------------------------------
+      # Cosmos3-Nano (16B, omnimodal) is served via the NVIDIA cosmos3 vLLM build,
+      # NOT the stock rhaii vLLM image: the vllm/vllm-omni:cosmos3 image ships the
+      # vllm-cosmos3 plugin. VSS captions frames over /v1/chat/completions, so we
+      # run the standard reasoning entrypoint (no --omni) with the Cosmos3Reasoner
+      # architecture override. BF16 only — FP4/FP8/FP16 are not supported upstream.
+      nvidia-cosmos3-reasoner:
         enabled: true
-        repoId: nvidia/cosmos3-reasoner
-        storage: 200Gi
-        runtimeImage: "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest"
+        repoId: nvidia/Cosmos3-Nano   # public, ungated
+        servedName: nvidia/cosmos3-nano-reasoner
+        # modelUri: hf://nvidia/Cosmos3-Nano   # override for pvc://, s3://, oci://
+        runtimeImage: "vllm/vllm-omni:cosmos3"
         vllmArgs:
+          - "--served-model-name"
+          - "nvidia/cosmos3-nano-reasoner"
+          - "--hf-overrides"
+          - '{"architectures": ["Cosmos3ReasonerForConditionalGeneration"]}'
+          - "--mm-encoder-tp-mode"
+          - "data"
+          - "--async-scheduling"
+          - "--allowed-local-media-path"
+          - "/"
+          - "--media-io-kwargs"
+          - '{"video": {"num_frames": -1}}'
           - "--gpu-memory-utilization"
           - "0.90"
-          - "--max-model-len"
-          - "28000"
-          - "--trust-remote-code"
-          # -- MIG: uncomment for tensor parallelism across 2x 3g.47gb slices
+          # -- Multi-GPU: uncomment for tensor parallelism across GPUs/MIG slices
           # - "--tensor-parallel-size"
           # - "2"
         resources:

@@ -95,7 +95,7 @@ The following instructions will deploy the VSS quickstart to your Red Hat AI env
 Before deployment, ensure you have the following in place:
 - OpenShift cluster with OpenShift AI installed (see version requirements above)
 - Helm CLI and OpenShift Client CLI (oc)
-- GPU nodes available with NVIDIA GPU Operator installed (required for on-cluster inference with NIM Operator or KServe; not required for NGC cloud inference)
+- GPU nodes available with NVIDIA GPU Operator installed (required for on-cluster inference with KServe; not required for NGC cloud inference)
 - MIG configured on GPU nodes if using MIG scheduling (see [Deployment Guide](docs/advanced-docs/deployment-guide.md#configuring-mig-on-h100-sxm5))
 
 Obtain the following API keys:
@@ -105,12 +105,12 @@ Obtain the following API keys:
 
 **Choose a model serving option:**
 
-| | Option A: NGC Cloud Inference | Option B: KServe (RHOAI) | Option C: NIM Operator |
-|---|---|---|---|
-| **Models run** | On NVIDIA's hosted API | On your cluster GPUs via KServe | On your cluster GPUs via NIM CRDs |
-| **GPU requirement** | VIOS pipeline only (~1 GPU) | 2-3x H100/A100 | 2-3x H100/A100 |
-| **Additional prerequisites** | None | RHOAI with KServe configured | NVIDIA NIM Operator installed |
-| **Best for** | Quick evaluation, limited GPU capacity | Production on RHOAI, no NIM Operator | Full NVIDIA stack, NIM Operator available |
+| | Option A: NGC Cloud Inference | Option B: KServe (RHOAI) |
+|---|---|---|
+| **Models run** | On NVIDIA's hosted API | On your cluster GPUs via KServe |
+| **GPU requirement** | VIOS pipeline only (~1 GPU) | 2-3 GPUs (one per model + VIOS pipeline) |
+| **Additional prerequisites** | None | RHOAI with KServe configured |
+| **Best for** | Quick evaluation, limited GPU capacity | Production on RHOAI |
 
 ### Install
 
@@ -199,33 +199,18 @@ To disable (e.g. non-OpenShift, or you manage trust another way) set `global.ope
 
 #### Option B: Local Model Serving with KServe (models on your GPUs)
 
-Deploys models as KServe LLMInferenceServices managed by Red Hat OpenShift AI. Requires GPU nodes with NVIDIA GPU Operator and RHOAI with KServe model serving configured. No NIM Operator needed.
+Deploys models as KServe LLMInferenceServices managed by Red Hat OpenShift AI. Requires GPU nodes with NVIDIA GPU Operator and RHOAI with KServe model serving configured.
 
 ```bash
 helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
   -n vss \
   -f deploy/helm/developer-profiles/dev-profile-base/values-openshift.yaml \
   --set-string ngc.apiKey="$NGC_API_KEY" \
-  --set nims.enabled=false \
   --set openshift.ai.useKserve=true \
   --set global.externalHost=vss.${APPS_DOMAIN}
 ```
 
-GPU pods may take 20-30 minutes on first deploy while model weights download. See the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-vs-nim-operator) for KServe configuration details and MIG GPU scheduling.
-
-#### Option C: Local Model Serving with NIM Operator (models on your GPUs)
-
-Deploys models via NVIDIA NIM Operator CRDs (NIMCache + NIMService). Requires the NVIDIA NIM Operator installed on your cluster in addition to GPU nodes with the GPU Operator.
-
-```bash
-helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
-  -n vss \
-  -f deploy/helm/developer-profiles/dev-profile-base/values-openshift.yaml \
-  --set-string ngc.apiKey="$NGC_API_KEY" \
-  --set global.externalHost=vss.${APPS_DOMAIN}
-```
-
-GPU pods may take 20-30 minutes on first deploy while model weights download.
+GPU pods may take 20-30 minutes on first deploy while model weights download. See the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-model-serving) for KServe configuration details and MIG GPU scheduling.
 
 #### Verify Installation
 
@@ -303,7 +288,7 @@ oc delete configmap cluster-monitoring-config -n openshift-monitoring
 This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) as part of the [Red Hat AI Quickstarts](https://www.redhat.com/en/blog/introducing-ai-quickstarts) initiative, adding:
 
 - **OpenShift AI deployment** — Per-profile `values-openshift.yaml` overlays with path-based Routes, custom SCCs (NIM SELinux relabel avoidance, VIOS anyuid), pod affinity, security context nulling for restricted-v2, and NGC secret creation. All OpenShift resources are gated by `global.openshift.enabled` and applied at install time.
-- **Three model serving options** — NGC cloud inference (`values-ngc.yaml` overlay, no local model GPUs), KServe LLMInferenceServices via RHOAI (`openshift.ai.useKserve` flag), or NVIDIA NIM Operator CRDs (upstream default). See [Install](#install) for usage and the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-vs-nim-operator) for KServe details.
+- **Two model serving options** — NGC cloud inference (`values-ngc.yaml` overlay, no local model GPUs) or KServe LLMInferenceServices via RHOAI (`openshift.ai.useKserve` flag). See [Install](#install) for usage and the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-model-serving) for KServe details.
 - **MIG GPU scheduling** — Validated MIG configuration for running GPU workloads on two physical H100 SXM5 96GB GPUs with documented MIG setup commands.
 - **Observability stack** — OpenTelemetry Collector, Grafana with Prometheus dashboards, User Workload Monitoring with PodMonitors, and standalone MLflow tracking server. See the [Observability Guide](docs/advanced-docs/observability-guide.md).
 - **MLflow tracing** — Per-request pipeline telemetry logged to MLflow without rebuilding the container image (deferred to Phase 2 — see [Fork Customizations](docs/advanced-docs/fork.md)).
@@ -311,7 +296,7 @@ This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://githu
 
 ### Quick Configuration Changes
 
-- **Model Serving Backend:** Layer `values-ngc.yaml` for NGC cloud inference, set `openshift.ai.useKserve=true` for KServe, or use the default NIM Operator mode — see [Install](#install)
+- **Model Serving Backend:** Layer `values-ngc.yaml` for NGC cloud inference, or set `openshift.ai.useKserve=true` for on-cluster KServe serving — see [Install](#install)
 - **Developer Profile:** Choose a different profile directory for additional capabilities (alerts, search, live video) — each has its own `values-openshift.yaml` with profile-specific component keys
 - **GPU Tolerations:** Edit the `&gpu-tolerations` anchor in the profile's `values-openshift.yaml` to match your node taints — all GPU workloads inherit it
 - **Model Selection:** Override NIM model images and resources in the profile's `values-openshift.yaml`

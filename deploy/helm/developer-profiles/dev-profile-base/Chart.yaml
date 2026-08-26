@@ -36,8 +36,4 @@ dependencies:
     version: 3.2.0
     repository: "file://../../services/ui"
     condition: vss-agent-ui.enabled
-  - name: nims
-    version: 3.2.0
-    repository: "file://../../services/nims"
-    condition: nims.enabled
 maintainers: []

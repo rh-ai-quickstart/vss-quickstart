@@ -1,119 +1,22 @@
 {{- if and .Values.global.openshift.enabled .Values.openshift.ai.useKserve }}
 # =====================================================================
-# KServe model serving — alternative to NIM Operator CRDs.
-# Gate: openshift.ai.useKserve=true  AND  nims.enabled=false
+# KServe model serving — on-cluster models via RHOAI.
+# Gate: openshift.ai.useKserve=true
 #
-# Creates LLMInferenceService + model-download Job + PVC
-# for each enabled model in openshift.ai.kserveModels.
+# Creates one LLMInferenceService per enabled model in
+# openshift.ai.kserveModels. Model weights are pulled by KServe's
+# storage-initializer directly from model.uri (hf:// by default) into
+# /mnt/models — no manual download Job or PVC. Gated HuggingFace repos
+# require a token secret (see hfTokenSecret / hfTokenKey below).
 # =====================================================================
 
 {{- range $name, $model := .Values.openshift.ai.kserveModels }}
 {{- if $model.enabled }}
 # ---------------------------------------------------------------
-# {{ $name }} — PVC for model weights
+# {{ $name }} — LLMInferenceService (serving.kserve.io/v1alpha1)
+# Model source: {{ $model.modelUri | default (printf "hf://%s" $model.repoId) }}
 # ---------------------------------------------------------------
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ $name }}-pvc
-  namespace: {{ $.Release.Namespace }}
-  labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ $model.storage | default "50Gi" }}
----
-# ---------------------------------------------------------------
-# {{ $name }} — model download Job
-# ---------------------------------------------------------------
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: download-{{ $name }}
-  namespace: {{ $.Release.Namespace }}
-  labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service }}
-spec:
-  backoffLimit: 3
-  template:
-    spec:
-      {{- if and $.Values.openshift.serviceAccount $.Values.openshift.serviceAccount.name }}
-      serviceAccountName: {{ $.Values.openshift.serviceAccount.name }}
-      {{- end }}
-      containers:
-      - name: downloader
-        image: {{ $model.downloadImage | default "registry.redhat.io/ubi9/python-311" }}
-        {{- if $model.downloadCommand }}
-        command:
-        - /bin/sh
-        - -c
-        - {{ $model.downloadCommand | quote }}
-        {{- else }}
-        command:
-        - /bin/sh
-        - -c
-        - |
-          python3 -c "
-          import os
-          try:
-              from huggingface_hub import snapshot_download
-          except ImportError:
-              import subprocess
-              subprocess.check_call(['pip', 'install', '--quiet', 'huggingface_hub'])
-              from huggingface_hub import snapshot_download
-
-          repo_id = '{{ $model.repoId }}'
-          local_dir = '/mnt/pvc'
-          token = os.getenv('HF_TOKEN')
-
-          print(f'Starting download for {repo_id}...')
-          snapshot_download(
-              repo_id=repo_id,
-              local_dir=local_dir,
-              token=token,
-              local_dir_use_symlinks=False
-          )
-          print(f'Success! Weights downloaded to {local_dir}')
-          "
-        {{- end }}
-        env:
-        - name: HF_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ $model.hfTokenSecret | default "hf-token-secret" }}
-              key: {{ $model.hfTokenKey | default "HF_TOKEN" }}
-              optional: true
-        - name: NGC_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ $model.ngcApiSecret | default "ngc-api-key-secret" }}
-              key: {{ $model.ngcApiKey | default "NGC_API_KEY" }}
-              optional: true
-        volumeMounts:
-        - name: model-volume
-          mountPath: /mnt/pvc
-        resources:
-          requests:
-            cpu: "1"
-            memory: 4Gi
-          limits:
-            cpu: "4"
-            memory: 8Gi
-      restartPolicy: Never
-      volumes:
-      - name: model-volume
-        persistentVolumeClaim:
-          claimName: {{ $name }}-pvc
----
-# ---------------------------------------------------------------
-# {{ $name }} — LLMInferenceService (serving.kserve.io/v1alpha2)
-# Replaces the old ServingRuntime + InferenceService pair.
-# Container spec is inline; model weights via PVC.
-# ---------------------------------------------------------------
-apiVersion: serving.kserve.io/v1alpha2
+apiVersion: serving.kserve.io/v1alpha1
 kind: LLMInferenceService
 metadata:
   name: {{ $name }}
@@ -127,27 +30,37 @@ metadata:
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
 spec:
   model:
-    uri: pvc://{{ $name }}-pvc/
-  replicas: {{ $model.minReplicas | default 1 }}
-  storageInitializer:
-    enabled: false
+    # hf://<org>/<repo> by default; override with modelUri for pvc://, s3://, oci://, etc.
+    uri: {{ $model.modelUri | default (printf "hf://%s" $model.repoId) }}
+    name: {{ $model.servedName | default $model.repoId | quote }}
+  replicas: {{ $model.replicas | default 1 }}
   template:
     containers:
-    - name: kserve-container
-      image: {{ $model.runtimeImage | default "registry.redhat.io/rhoai/vllm-cuda-rhel9:latest" }}
+    - name: main
+      image: {{ required (printf "openshift.ai.kserveModels.%s.runtimeImage is required" $name) $model.runtimeImage }}
       command:
       - python
       - -m
       - vllm.entrypoints.openai.api_server
       args:
+      - "--model"
+      - "/mnt/models"
       {{- range $model.vllmArgs }}
       - {{ . | quote }}
       {{- end }}
       env:
-      - name: HF_HUB_OFFLINE
-        value: "1"
+      # Storage-initializer downloads gated repos; the token secret must also be
+      # visible to that init container on-cluster (see hfTokenSecret note in values).
+      - name: HF_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: {{ $model.hfTokenSecret | default "hf-token-secret" }}
+            key: {{ $model.hfTokenKey | default "HF_TOKEN" }}
+            optional: true
       ports:
-      - containerPort: 8080
+      # vLLM's OpenAI-compatible server listens on 8000 by default; the vss-agent
+      # targets the model services on :8000 (see agent chart llm/vlm endpoints).
+      - containerPort: 8000
         protocol: TCP
       resources:
         {{- toYaml $model.resources | nindent 8 }}

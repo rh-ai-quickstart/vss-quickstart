@@ -72,7 +72,7 @@ The upstream chart was completely restructured between v2.4.1 and v3.2.1. This t
 | Custom Work | Source | v3.2.1 Location | Status |
 |-------------|--------|-----------------|--------|
 | Path-based Routes (7 core + profile-specific) | rh-ai-quickstart fork | `developer-profiles/*/templates/openshift-routes.yaml` | Adopted from fork |
-| NIM custom SCC (SELinux relabel avoidance) | rh-ai-quickstart fork | `services/nims/templates/openshift-nim-scc.yaml` | Adopted from fork |
+| NIM custom SCC (SELinux relabel avoidance) | rh-ai-quickstart fork | (removed with NIM Operator path) | Removed from quickstart |
 | VIOS anyuid SCC (3 ServiceAccounts) | rh-ai-quickstart fork | `services/vios/templates/openshift-scc-anyuid.yaml` | Adopted from fork |
 | Pod affinity (sensor↔streamprocessing) | rh-ai-quickstart fork | Per-profile `values-openshift.yaml` | Adopted from fork |
 | Security context nulling (restricted-v2) | rh-ai-quickstart fork | Per-profile `values-openshift.yaml` | Adopted from fork |
@@ -82,8 +82,7 @@ The upstream chart was completely restructured between v2.4.1 and v3.2.1. This t
 ### KServe Model Serving (our addition, not in fork)
 | Custom Work | v3.2.1 Location | Status |
 |-------------|-----------------|--------|
-| KServe LLMInferenceService (serving.kserve.io/v1alpha2) | `developer-profiles/*/templates/openshift-ai.yaml` | Ported to all 4 profiles (data-driven via `openshift.ai.kserveModels`) |
-| Model download Jobs + PVCs | `developer-profiles/*/templates/openshift-ai.yaml` | Integrated into template loop |
+| KServe LLMInferenceService (serving.kserve.io/v1alpha1) | `developer-profiles/*/templates/openshift-ai.yaml` | Data-driven via `openshift.ai.kserveModels`; weights pulled by storage-initializer from `hf://` (no download Job/PVC) |
 | KServe model config | Per-profile `values-openshift.yaml` under `openshift.ai` | Complete — nemotron + cosmos3 |
 | MIG GPU resource requests | Per-profile `values-openshift.yaml` | TODO — needs MIG profiles for new models |
 
@@ -141,5 +140,5 @@ These are new and have no custom work yet:
 | Analytics | `services/analytics/` | Behavior analytics + API |
 | Alert Bridge | `services/alert/` | VLM-based alert verification |
 | Video Summarization | `services/video-summarization/` | Long video summarization |
-| NIM Operator CRDs | `services/nims/` | Replaces raw KServe for model serving |
+| NIM Operator CRDs | (upstream `services/nims/`) | Removed from this AI quickstart repository; on-cluster serving uses KServe |
 | Agent UI (Next.js) | `services/ui/` | Replaces Gradio frontend |

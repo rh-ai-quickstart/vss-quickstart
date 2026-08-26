@@ -33,24 +33,16 @@ global:
   externalScheme: "http" # http or https
   externalHost: "EXTERNAL_HOST" # e.g. vss.140.238.75.84.nip.io
   externalPort: "" # Default 80 (http) / 443 (https): use "" — chart omits :port in URLs. Non-default port only: e.g. "8080", "8443".
-  # Remote NIM: one place for vss-agent (same pattern as dev-profile-lvs values-lvs.yaml). Set nims.enabled false when using remote endpoints only.
+  # Remote LLM/VLM endpoints for vss-agent. Leave blank for on-cluster KServe
+  # serving; set to NGC cloud URLs (or layer values-ngc.yaml) for remote inference.
   llmBaseUrl: ""
   vlmBaseUrl: ""
   llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
   vlmName: "nvidia/cosmos3-nano-reasoner"
 
-# Shared NIM umbrella: helm/services/nims. Set nims.global.ngcApiKey to the same value as ngc.apiKey so NIMCache/NIMService can pull models (or rely on pre-created ngc-secret / ngc-api).
-nims:
-  enabled: true
-  gpuType: RTXPRO6000BW
-  global:
-    ngcApiKey: ""
-  nemotron:
-    enabled: true
-  cosmos:
-    enabled: false
-  cosmos3:
-    enabled: true
+# Model serving: choose one —
+#   * KServe (on-cluster): -f values-openshift.yaml --set openshift.ai.useKserve=true
+#   * NGC cloud inference:  -f values-ngc.yaml
 
 # VIOS umbrella (helm/services/vios): parent Chart.yaml uses condition: vios.enabled — that key must stay true here or in values.yaml or the whole VST stack is skipped (no postgres/sensor/ingress/…).
 vios:

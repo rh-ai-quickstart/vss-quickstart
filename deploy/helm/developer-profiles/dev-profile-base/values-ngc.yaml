@@ -13,16 +13,7 @@
 #     --set-string ngc.apiKey="$NGC_API_KEY" \
 #     --set global.externalHost=vss.${APPS_DOMAIN}
 
-# Disable on-cluster NIM model serving (no GPU pods needed for inference)
-nims:
-  nemotron:
-    enabled: false
-  cosmos:
-    enabled: false
-  cosmos3:
-    enabled: false
-
-# Disable KServe model serving
+# Disable on-cluster KServe model serving (no GPU pods needed for inference)
 openshift:
   ai:
     useKserve: false
@@ -41,7 +32,7 @@ global:
   # The VSS video_understanding tool's remote path samples JPEG frames and sends
   # them as base64 images (not a video_url), so any image-capable VL model works;
   # this one accepts image+video input over the OpenAI-compatible chat API and
-  # pairs with the Nemotron LLM above. For on-cluster (KServe/NIM) deploys,
+  # pairs with the Nemotron LLM above. For on-cluster (KServe) deploys,
   # keep Cosmos3-Reasoner — see values-openshift.yaml.
   vlmName: "nvidia/nemotron-nano-12b-v2-vl"
 
