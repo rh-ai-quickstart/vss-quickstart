@@ -172,6 +172,16 @@ openshift:
           - "--max-model-len"
           - "16384"
           - "--trust-remote-code"
+          # Tool calling: Nemotron needs its custom parser plugin (ships in the HF
+          # repo -> /mnt/models). Use "nemotron_nano_v2" on newer vLLM builds.
+          - "--enable-auto-tool-choice"
+          - "--tool-parser-plugin"
+          - "/mnt/models/nemotron_toolcall_parser_no_streaming.py"
+          - "--tool-call-parser"
+          - "nemotron_json"
+          # float32 Mamba SSM cache required for accuracy
+          - "--mamba_ssm_cache_dtype"
+          - "float32"
         resources:
           limits:
             cpu: "12"
