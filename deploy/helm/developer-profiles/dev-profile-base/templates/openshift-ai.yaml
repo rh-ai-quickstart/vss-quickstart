@@ -49,6 +49,28 @@ spec:
       - {{ . | quote }}
       {{- end }}
       env:
+      # -- OpenShift arbitrary-UID compatibility --------------------------------
+      # Pods run under the restricted-v2 SCC with a random UID that has no entry
+      # in /etc/passwd and no home dir. Without USER/LOGNAME set, Python's
+      # getpass.getuser() falls through to pwd.getpwuid() and crashes on import
+      # ("KeyError: getpwuid(): uid not found"); torch/HF/vLLM also need a
+      # writable HOME and cache dirs (the UID's default home is not writable).
+      - name: USER
+        value: "vllm"
+      - name: LOGNAME
+        value: "vllm"
+      - name: HOME
+        value: "/tmp"
+      - name: XDG_CACHE_HOME
+        value: "/tmp/.cache"
+      - name: HF_HOME
+        value: "/tmp/.cache/huggingface"
+      - name: TORCHINDUCTOR_CACHE_DIR
+        value: "/tmp/.cache/torchinductor"
+      - name: TRITON_CACHE_DIR
+        value: "/tmp/.cache/triton"
+      - name: VLLM_CACHE_ROOT
+        value: "/tmp/.cache/vllm"
       # Storage-initializer downloads gated repos; the token secret must also be
       # visible to that init container on-cluster (see hfTokenSecret note in values).
       - name: HF_TOKEN
@@ -57,6 +79,9 @@ spec:
             name: {{ $model.hfTokenSecret | default "hf-token-secret" }}
             key: {{ $model.hfTokenKey | default "HF_TOKEN" }}
             optional: true
+      {{- with $model.extraEnv }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       ports:
       # vLLM's OpenAI-compatible server listens on 8000 by default; the vss-agent
       # targets the model services on :8000 (see agent chart llm/vlm endpoints).
