@@ -32,6 +32,15 @@ global:
   externalScheme: "https"
   imagePullSecrets:
     - name: ngc-secret
+  # -- KServe on-cluster model endpoints for vss-agent -------------------------
+  # KServe names the model Service <llminferenceservice-name>-kserve-workload-svc
+  # and vLLM serves HTTPS on 8000 (see TLS args in templates/openshift-ai.yaml).
+  # Same-namespace short DNS keeps this namespace-agnostic. The agent appends /v1.
+  # (For Option A, values-ngc.yaml layers after this and overrides these URLs.)
+  llmBaseUrl: "https://nvidia-nemotron-nano-9b-v2-kserve-workload-svc:8000"
+  vlmBaseUrl: "https://nvidia-cosmos3-reasoner-kserve-workload-svc:8000"
+  llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
+  vlmName: "nvidia/cosmos3-nano-reasoner"
 
 # Disable Kubernetes Ingress (replaced by OpenShift Routes in openshift-routes.yaml)
 vssIngress:
