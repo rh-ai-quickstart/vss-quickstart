@@ -75,6 +75,23 @@ ngc:
   createSecrets: true
   apiKey: ""    # set via --set ngc.apiKey=$NGC_API_KEY
 
+# -- Agent: route the VLM through the on-cluster vLLM (OpenAI-compatible) -------
+# Default VLM_MODEL_TYPE=nim makes the agent treat any "cosmos" model as an NVIDIA
+# NIM and send NIM-style mm_processor_kwargs (videos_kwargs.min_pixels/max_pixels).
+# Cosmos3-Nano is served here via vLLM's Qwen3-VL processor, which rejects those
+# kwargs (TypeError: unexpected keyword 'min_pixels'). Selecting the vllm_vlm
+# profile (OpenAI-compatible, same VLM_BASE_URL) sets is_nim=false so those kwargs
+# are omitted; frame count stays server-side via the model's --media-io-kwargs.
+# OPENAI_API_KEY is required by the OpenAI client but unused (KServe serves the
+# model without auth). NGC path replaces this extraEnv list (see values-ngc.yaml).
+agent:
+  vss-agent:
+    extraEnv:
+      - name: VLM_MODEL_TYPE
+        value: "vllm"
+      - name: OPENAI_API_KEY
+        value: "EMPTY"
+
 # -- VIOS: pod affinity + GPU tolerations ------------------------------------
 # NOTE: vss-vios-sensor defines the &gpu-tolerations anchor reused by all GPU
 # workloads below (agent VLM/RTVI, KServe gpuTolerations).
@@ -174,7 +191,7 @@ openshift:
           - "--gpu-memory-utilization"
           - "0.90"
           - "--max-model-len"
-          - "16384"
+          - "32768"
           - "--trust-remote-code"
           - "--enable-auto-tool-choice"
           - "--tool-parser-plugin"
