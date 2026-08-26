@@ -12,6 +12,23 @@
 
 {{- range $name, $model := .Values.openshift.ai.kserveModels }}
 {{- if $model.enabled }}
+{{- if $model.toolParserPluginFile }}
+# ---------------------------------------------------------------
+# {{ $name }} — custom vLLM tool-call parser plugin
+# Mounted read-only at /opt/vss-tool-parsers; referenced by --tool-parser-plugin.
+# ---------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-tool-parser
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+data:
+  {{ $model.toolParserPluginFile }}: |
+{{ $.Files.Get (printf "files/vllm-tool-parsers/%s" $model.toolParserPluginFile) | indent 4 }}
+---
+{{- end }}
 # ---------------------------------------------------------------
 # {{ $name }} — LLMInferenceService (serving.kserve.io/v1alpha1)
 # Model source: {{ $model.modelUri | default (printf "hf://%s" $model.repoId) }}
@@ -132,11 +149,21 @@ spec:
       volumeMounts:
       - name: shm
         mountPath: /dev/shm
+      {{- if $model.toolParserPluginFile }}
+      - name: tool-parser
+        mountPath: /opt/vss-tool-parsers
+        readOnly: true
+      {{- end }}
     volumes:
     - name: shm
       emptyDir:
         medium: Memory
         sizeLimit: {{ $model.shmSize | default "2Gi" }}
+    {{- if $model.toolParserPluginFile }}
+    - name: tool-parser
+      configMap:
+        name: {{ $name }}-tool-parser
+    {{- end }}
     {{- if $.Values.openshift.gpuTolerations }}
     tolerations:
       {{- toYaml $.Values.openshift.gpuTolerations | nindent 6 }}
