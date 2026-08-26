@@ -35,6 +35,14 @@
        hand-edited) into the single file SSL_CERT_FILE points at. */}}
 {{- $trustExtra := $trust.extraCAConfigMaps | default ($gTrust.extraCAConfigMaps | default (list)) }}
 {{- $trustCombine := and $trustOn (gt (len $trustExtra) 0) }}
+{{- /* Image for the build-ca-bundle initContainer: the vss-agent image is
+       shell-less (no sh/cat), so use a small busybox-style utility image. Defaults
+       to the waitForDependencies image (busybox) already standardized in this chart;
+       override via trustedCA.buildImage / global.openshift.trustedCA.buildImage for
+       disconnected registries. */}}
+{{- $wdImg := (.Values.waitForDependencies | default dict).image | default dict }}
+{{- $wdImgStr := ternary (printf "%s:%s" ($wdImg.repository | default "busybox") ($wdImg.tag | default "1.37.0")) "busybox:1.37.0" (hasKey $wdImg "repository") }}
+{{- $trustBuildImage := $trust.buildImage | default ($gTrust.buildImage | default $wdImgStr) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -66,7 +74,7 @@ spec:
         {{- /* Concatenate the CNO-managed cluster bundle with each extra CA ConfigMap
                into a single PEM on the shared emptyDir; SSL_CERT_FILE points here. */}}
         - name: build-ca-bundle
-          image: {{ include "vss-agent.image" . }}
+          image: {{ $trustBuildImage }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - sh

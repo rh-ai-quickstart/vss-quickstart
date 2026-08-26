@@ -29,6 +29,13 @@ global:
     trustedCA:
       enabled: true
       configMapName: vss-combined-ca
+      # -- build-ca-bundle initContainer image ---------------------------------
+      # The vss-agent image is shell-less, so the concat step runs in a small
+      # busybox image (defaults to the chart's waitForDependencies image). On a
+      # disconnected cluster where docker.io/busybox is unreachable, override with
+      # a mirrored equivalent, e.g.:
+      #   buildImage: "registry.redhat.io/ubi9/ubi-minimal:latest"
+      # buildImage: "busybox:1.37.0"
       # -- Extra CA ConfigMaps to append to the trust bundle (KServe path only) --
       # KServe serves each on-cluster model over HTTPS with a cert issued by the
       # OpenShift service-CA signer. aiohttp (agent -> model) can't skip verification
