@@ -166,8 +166,11 @@ openshift:
         vllmArgs:
           - "--served-model-name"
           - "nvidia/cosmos3-nano-reasoner"
+          # The vllm/vllm-omni:cosmos3 image (vLLM 0.25.0) registers Cosmos3 natively
+          # as Cosmos3ForConditionalGeneration. (The Cosmos3Reasoner* name is only in
+          # the standard-vLLM + vllm-cosmos3 plugin build, vllm==0.21.0 — not here.)
           - "--hf-overrides"
-          - '{"architectures": ["Cosmos3ReasonerForConditionalGeneration"]}'
+          - '{"architectures": ["Cosmos3ForConditionalGeneration"]}'
           - "--mm-encoder-tp-mode"
           - "data"
           - "--async-scheduling"
