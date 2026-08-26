@@ -27,6 +27,14 @@
 {{- $trustMount := $trust.mountPath | default ($gTrust.mountPath | default "/etc/pki/tls/custom-certs") }}
 {{- $trustOn := and $trustEnabled (ne $trustCM "") }}
 {{- $trustFile := printf "%s/%s" $trustMount $trustKey }}
+{{- /* Extra CA ConfigMaps appended to the trust bundle at pod start — each an
+       {name, key} whose data[key] is PEM. Used for the OpenShift service-CA signer
+       (injected into vss-service-ca[service-ca.crt]) so aiohttp/requests verify the
+       on-cluster KServe model HTTPS endpoints. The build-ca-bundle initContainer
+       concatenates these with the CNO-managed cluster bundle (which cannot be
+       hand-edited) into the single file SSL_CERT_FILE points at. */}}
+{{- $trustExtra := $trust.extraCAConfigMaps | default ($gTrust.extraCAConfigMaps | default (list)) }}
+{{- $trustCombine := and $trustOn (gt (len $trustExtra) 0) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -50,7 +58,44 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and .Values.waitForDependencies .Values.waitForDependencies.enabled }}
+      {{- $waitDeps := and .Values.waitForDependencies .Values.waitForDependencies.enabled }}
+      {{- if or $waitDeps $trustCombine }}
+      initContainers:
+      {{- end }}
+      {{- if $trustCombine }}
+        {{- /* Concatenate the CNO-managed cluster bundle with each extra CA ConfigMap
+               into a single PEM on the shared emptyDir; SSL_CERT_FILE points here. */}}
+        - name: build-ca-bundle
+          image: {{ include "vss-agent.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              : > {{ $trustFile }}
+              if [ -f /ca-src/cluster/{{ $trustKey }} ]; then
+                cat /ca-src/cluster/{{ $trustKey }} >> {{ $trustFile }}
+              fi
+              for f in /ca-src/extra/*/ca.crt; do
+                [ -f "$f" ] || continue
+                echo "" >> {{ $trustFile }}
+                cat "$f" >> {{ $trustFile }}
+              done
+              echo "Wrote combined CA bundle to {{ $trustFile }}"
+          volumeMounts:
+            - name: trusted-ca
+              mountPath: {{ $trustMount }}
+            - name: trusted-ca-cluster
+              mountPath: /ca-src/cluster
+              readOnly: true
+            {{- range $i, $s := $trustExtra }}
+            - name: kca-{{ $i }}
+              mountPath: /ca-src/extra/{{ $i }}
+              readOnly: true
+            {{- end }}
+      {{- end }}
+      {{- if $waitDeps }}
       {{- $g := .Values.global | default dict }}
       {{- $pfx := default false (coalesce .Values.useReleaseNamePrefix (index $g "useReleaseNamePrefix")) }}
       {{- $kafkaDef := ternary (printf "%s-kafka-kafka" .Release.Name) "kafka-kafka" $pfx }}
@@ -59,7 +104,6 @@ spec:
       {{- $kafkaH := .Values.waitForDependencies.kafkaHost | default $kafkaDef }}
       {{- $redisH := .Values.waitForDependencies.redisHost | default $redisDef }}
       {{- $esH := .Values.waitForDependencies.elasticsearchHost | default $esDef }}
-      initContainers:
         - name: wait-for-kafka-redis-elasticsearch
           image: {{ .Values.waitForDependencies.image.repository }}:{{ .Values.waitForDependencies.image.tag }}
           imagePullPolicy: {{ .Values.waitForDependencies.image.pullPolicy }}
@@ -198,9 +242,29 @@ spec:
         {{- end }}
         {{- if $trustOn }}
         - name: trusted-ca
+          {{- if $trustCombine }}
+          {{- /* build-ca-bundle writes the combined PEM here; shared with initContainer. */}}
+          emptyDir: {}
+          {{- else }}
           configMap:
             name: {{ $trustCM }}
             optional: true
+          {{- end }}
+        {{- end }}
+        {{- if $trustCombine }}
+        - name: trusted-ca-cluster
+          configMap:
+            name: {{ $trustCM }}
+            optional: true
+        {{- range $i, $s := $trustExtra }}
+        - name: kca-{{ $i }}
+          configMap:
+            name: {{ $s.name }}
+            optional: true
+            items:
+              - key: {{ $s.key | default "service-ca.crt" }}
+                path: ca.crt
+        {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

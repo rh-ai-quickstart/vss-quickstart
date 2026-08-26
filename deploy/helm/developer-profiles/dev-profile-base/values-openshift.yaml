@@ -29,16 +29,33 @@ global:
     trustedCA:
       enabled: true
       configMapName: vss-combined-ca
+      # -- Extra CA ConfigMaps to append to the trust bundle (KServe path only) --
+      # KServe serves each on-cluster model over HTTPS with a cert issued by the
+      # OpenShift service-CA signer. aiohttp (agent -> model) can't skip verification
+      # via env var, so the agent must trust that signer. templates/openshift-service-ca.yaml
+      # creates vss-service-ca (annotated so OpenShift injects the signer into
+      # service-ca.crt); an initContainer concatenates it with the CNO-managed cluster
+      # bundle (which can't be hand-edited) into the one file SSL_CERT_FILE points at.
+      # One signer covers every model — no per-model list to maintain. Reset to [] in
+      # values-ngc.yaml (NGC endpoints are public HTTPS already covered by the cluster
+      # bundle, and vss-service-ca isn't created on that path).
+      extraCAConfigMaps:
+        - name: vss-service-ca
+          key: service-ca.crt
   externalScheme: "https"
   imagePullSecrets:
     - name: ngc-secret
   # -- KServe on-cluster model endpoints for vss-agent -------------------------
   # KServe names the model Service <llminferenceservice-name>-kserve-workload-svc
   # and vLLM serves HTTPS on 8000 (see TLS args in templates/openshift-ai.yaml).
-  # Same-namespace short DNS keeps this namespace-agnostic. The agent appends /v1.
-  # (For Option A, values-ngc.yaml layers after this and overrides these URLs.)
-  llmBaseUrl: "https://nvidia-nemotron-nano-9b-v2-kserve-workload-svc:8000"
-  vlmBaseUrl: "https://nvidia-cosmos3-reasoner-kserve-workload-svc:8000"
+  # The URL host MUST match a Subject Alternative Name on the service-CA serving
+  # cert, whose SANs are namespace-qualified (<svc>.<ns>.svc and .svc.cluster.local)
+  # -- there is no bare-name SAN -- so we use the <svc>.<ns>.svc form. NOTE the
+  # "vss" here is the release namespace: change it if you install into another
+  # namespace. The agent appends /v1. (For Option A, values-ngc.yaml layers after
+  # this and overrides these URLs with the NGC cloud endpoint.)
+  llmBaseUrl: "https://nvidia-nemotron-nano-9b-v2-kserve-workload-svc.vss.svc:8000"
+  vlmBaseUrl: "https://nvidia-cosmos3-reasoner-kserve-workload-svc.vss.svc:8000"
   llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
   vlmName: "nvidia/cosmos3-nano-reasoner"
 

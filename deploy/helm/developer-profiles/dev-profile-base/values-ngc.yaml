@@ -20,6 +20,13 @@ openshift:
 
 # Point agent to NGC cloud endpoints
 global:
+  # NGC cloud endpoints are public HTTPS covered by the cluster trust bundle, and the
+  # vss-service-ca ConfigMap isn't created on this path. Reset the KServe extra CAs
+  # (set in values-openshift.yaml) so the agent skips the combine initContainer and
+  # mounts the cluster bundle directly.
+  openshift:
+    trustedCA:
+      extraCAConfigMaps: []
   llmBaseUrl: "https://integrate.api.nvidia.com"
   vlmBaseUrl: "https://integrate.api.nvidia.com"
   llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
