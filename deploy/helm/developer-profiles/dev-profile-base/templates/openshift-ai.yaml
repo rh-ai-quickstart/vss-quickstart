@@ -23,10 +23,12 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   annotations:
     security.opendatahub.io/enable-auth: "false"
-    openshift.io/display-name: {{ $name }}
+    openshift.io/display-name: {{ $model.displayName | default $name }}
+    opendatahub.io/model-type: generative
   labels:
     networking.kserve.io/visibility: exposed
     opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
 spec:
   model:
@@ -34,6 +36,12 @@ spec:
     uri: {{ $model.modelUri | default (printf "hf://%s" $model.repoId) }}
     name: {{ $model.servedName | default $model.repoId | quote }}
   replicas: {{ $model.replicas | default 1 }}
+  {{- /* Gateway API routing. Set openshift.ai.router (or per-model router) to
+         expose via a Gateway; omit for in-cluster Service access only. */}}
+  {{- with (default $.Values.openshift.ai.router $model.router) }}
+  router:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     containers:
     - name: main
@@ -45,6 +53,13 @@ spec:
       args:
       - "--model"
       - "/mnt/models"
+      # -- TLS: KServe LLMInferenceService expects the model to serve HTTPS on the
+      # workload port and mounts a serving cert at /var/run/kserve/tls/. vLLM
+      # terminates TLS from it so the (HTTPS-scheme) KServe probes and gateway
+      # routing succeed. Clients (vss-agent) must therefore use https:// URLs.
+      - "--ssl-certfile=/var/run/kserve/tls/tls.crt"
+      - "--ssl-keyfile=/var/run/kserve/tls/tls.key"
+      - "--enable-ssl-refresh"
       {{- range $model.vllmArgs }}
       - {{ . | quote }}
       {{- end }}
@@ -83,12 +98,45 @@ spec:
       {{- toYaml . | nindent 6 }}
       {{- end }}
       ports:
-      # vLLM's OpenAI-compatible server listens on 8000 by default; the vss-agent
-      # targets the model services on :8000 (see agent chart llm/vlm endpoints).
+      # vLLM serves the OpenAI-compatible API (HTTPS, see TLS args) on 8000.
       - containerPort: 8000
+        name: http
         protocol: TCP
+      # Probes use scheme: HTTPS to match the TLS-terminating server above;
+      # the long startup failureThreshold covers first-time weight download + load.
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+        periodSeconds: 10
+        failureThreshold: 60
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+        periodSeconds: 10
+        failureThreshold: 3
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+        periodSeconds: 10
+        failureThreshold: 3
       resources:
         {{- toYaml $model.resources | nindent 8 }}
+      # vLLM uses shared memory for its multiprocessing/NCCL paths; the 64Mi
+      # container default is too small and can hang/crash larger or TP models.
+      volumeMounts:
+      - name: shm
+        mountPath: /dev/shm
+    volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ $model.shmSize | default "2Gi" }}
     {{- if $.Values.openshift.gpuTolerations }}
     tolerations:
       {{- toYaml $.Values.openshift.gpuTolerations | nindent 6 }}
