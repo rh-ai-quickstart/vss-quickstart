@@ -1,4 +1,4 @@
-{{- range $key, $monitor := .Values.nimMetricsMonitors }}
+{{- range $key, $monitor := .Values.modelMetricsMonitors }}
 {{- if $monitor.enabled }}
 ---
 apiVersion: monitoring.coreos.com/v1
@@ -15,6 +15,13 @@ spec:
     path: {{ .path }}
     {{- if .port }}
     port: {{ .port }}
+    {{- end }}
+    {{- if .scheme }}
+    scheme: {{ .scheme }}
+    {{- end }}
+    {{- with .tlsConfig }}
+    tlsConfig:
+      {{- toYaml . | nindent 6 }}
     {{- end }}
   {{- end }}
   selector:

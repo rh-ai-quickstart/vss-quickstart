@@ -28,26 +28,36 @@ userWorkloadMonitoringConfig:
     enabled: true
     enableAlertmanagerConfig: true
 
-# NIM model serving metrics — one PodMonitor per model
-nimMetricsMonitors:
+# One PodMonitor per KServe model. Metrics are on the "http" port (8000), served
+# over HTTPS — hence scheme: https + insecureSkipVerify (SAN mismatch on pod IP).
+# Select LLMInferenceService workload pods by their app.kubernetes.io/* labels.
+modelMetricsMonitors:
   nemotron:
     enabled: true
-    name: nim-nemotron-metrics
+    name: vss-nemotron-metrics
     podMetricsEndpoints:
       - interval: 15s
         path: /metrics
-        port: h2c
+        port: http
+        scheme: https
+        tlsConfig:
+          insecureSkipVerify: true
     selector:
       matchLabels:
-        app: nvidia-nemotron-nano-9b-v2
+        app.kubernetes.io/component: llminferenceservice-workload
+        app.kubernetes.io/name: nvidia-nemotron-nano-9b-v2
 
   cosmos3:
     enabled: true
-    name: nim-cosmos3-metrics
+    name: vss-cosmos3-metrics
     podMetricsEndpoints:
       - interval: 15s
         path: /metrics
-        port: h2c
+        port: http
+        scheme: https
+        tlsConfig:
+          insecureSkipVerify: true
     selector:
       matchLabels:
-        app: nvidia-cosmos3-reasoner
+        app.kubernetes.io/component: llminferenceservice-workload
+        app.kubernetes.io/name: nvidia-cosmos3-reasoner

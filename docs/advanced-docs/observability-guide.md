@@ -8,24 +8,23 @@ This guide covers the observability stack for VSS on OpenShift, providing metric
 |-------|------|---------|
 | `otel-operator` | OLM Subscription | Installs the OpenTelemetry Operator |
 | `grafana-operator` | OLM Subscription | Installs the Grafana Operator |
-| `otel-collector` | Resource | OpenTelemetry Collector scraping NIM model metrics |
-| `uwm` | Resource | User Workload Monitoring — PodMonitors for Prometheus |
-| `grafana` | Resource | Grafana instance with Prometheus datasource and NIM dashboards |
+| `otel-collector` | Resource | OpenTelemetry Collector for OTLP telemetry (traces/metrics pushed to it) |
+| `uwm` | Resource | User Workload Monitoring — PodMonitors that scrape model serving metrics |
+| `grafana` | Resource | Grafana instance with Prometheus datasource and model metrics dashboards |
 | `mlflow` | Resource | Standalone MLflow tracking server for pipeline traces |
 
 ## Architecture
 
 ```
-NIM Pods (nemotron, cosmos3)
+KServe model pods (nemotron, cosmos3)
   ├── /metrics endpoint
-  │     ├── scraped by → OTel Collector (OTLP pipeline)
   │     └── scraped by → Prometheus (via PodMonitors/UWM)
   │                         └── queried by → Grafana dashboards
   └── inference calls
         └── traced by → MLflow (experiment tracking)
 ```
 
-- **Metrics path**: NIM pods expose `/metrics` → PodMonitors tell UWM Prometheus to scrape them → Grafana queries Prometheus via the Thanos Querier
+- **Metrics path**: model pods expose `/metrics` → PodMonitors tell UWM Prometheus to scrape them → Grafana queries Prometheus via the Thanos Querier
 - **Traces path**: Application code sends traces to MLflow tracking server → viewable in MLflow UI
 
 ## Quick Start
@@ -46,9 +45,9 @@ This creates the `observability-hub` namespace, installs the OTel and Grafana op
 ```
 
 Installs in order:
-1. **UWM** — ConfigMaps for `cluster-monitoring-config` and `user-workload-monitoring-config` that enable user workload monitoring, plus PodMonitors for each NIM model
-2. **OTel Collector** — `OpenTelemetryCollector` CR in `observability-hub` that scrapes NIM metrics
-3. **Grafana** — Grafana instance with Prometheus datasource pointing at the Thanos Querier, plus NIM metrics dashboards
+1. **UWM** — ConfigMaps for `cluster-monitoring-config` and `user-workload-monitoring-config` that enable user workload monitoring, plus PodMonitors for each model
+2. **OTel Collector** — `OpenTelemetryCollector` CR in `observability-hub` that receives OTLP telemetry
+3. **Grafana** — Grafana instance with Prometheus datasource pointing at the Thanos Querier, plus model metrics dashboards
 4. **MLflow** — Standalone MLflow deployment in the `vss` namespace
 
 ### 3. Access dashboards
@@ -71,21 +70,13 @@ oc get route mlflow -n vss -o jsonpath='{.spec.host}'
 
 Deployed as an `OpenTelemetryCollector` CR. The collector configuration is passed as a single YAML block in `values.yaml`:
 
-- **Receivers**: Prometheus scraper targeting NIM model endpoints, OTLP receiver
+- **Receivers**: OTLP (gRPC `:4317`, HTTP `:4318`)
 - **Exporters**: Debug (configurable)
-- **Pipelines**: `metrics` (prometheus+otlp → debug), `traces` (otlp → debug)
+- **Pipelines**: `metrics` (otlp → debug), `traces` (otlp → debug)
 
-Scrape targets are configured in `values.yaml` under `collector.config`:
-
-```yaml
-scrape_configs:
-  - job_name: nim-nemotron
-    static_configs:
-      - targets: ['nvidia-nemotron-nano-9b-v2.vss.svc.cluster.local:8000']
-  - job_name: nim-cosmos3
-    static_configs:
-      - targets: ['nvidia-cosmos3-reasoner.vss.svc.cluster.local:8000']
-```
+The collector handles OTLP telemetry pushed to it; it does not scrape model
+`/metrics`. Model serving metrics are collected by the UWM PodMonitors (see
+below), not by this collector.
 
 ### User Workload Monitoring (UWM)
 
@@ -94,14 +85,14 @@ Creates two ConfigMaps to enable OpenShift's built-in Prometheus stack for user 
 - `cluster-monitoring-config` in `openshift-monitoring` — enables user workload monitoring and configures platform Prometheus retention/storage
 - `user-workload-monitoring-config` in `openshift-user-workload-monitoring` — configures user workload Prometheus retention/storage
 
-PodMonitors are created for each NIM model, configured via the `nimMetricsMonitors` map in `values.yaml`. Adding a new model only requires adding an entry to that map.
+PodMonitors are created for each model, configured via the `modelMetricsMonitors` map in `values.yaml`. Adding a new model only requires adding an entry to that map.
 
 ### Grafana
 
 - **Instance**: Grafana CR with Prometheus datasource pointing at `https://thanos-querier.openshift-monitoring.svc.cluster.local:9091`
 - **Authentication**: Uses a `grafana-sa` ServiceAccount with `cluster-monitoring-view` ClusterRoleBinding and a service-account-token Secret created by a post-install Job
 - **Route**: TLS edge-terminated OpenShift Route
-- **Dashboards**: NIM model metrics (request latency, throughput, token counts)
+- **Dashboards**: model metrics (request latency, throughput, token counts)
 
 ### MLflow
 
@@ -128,11 +119,10 @@ oc delete configmap cluster-monitoring-config -n openshift-monitoring
 
 ## Customization
 
-### Adding a new NIM model to monitoring
+### Adding a new model to monitoring
 
-1. Add an entry to `nimMetricsMonitors` in `deploy/helm/observability/helm/uwm/values.yaml`
-2. Add a scrape target to `collector.config` in `deploy/helm/observability/helm/otel-collector/values.yaml`
-3. Run `helm upgrade` on both charts
+1. Add an entry to `modelMetricsMonitors` in `deploy/helm/observability/helm/uwm/values.yaml`
+2. Run `helm upgrade` on the UWM chart
 
 ### Changing retention periods
 

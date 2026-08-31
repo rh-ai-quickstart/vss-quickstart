@@ -6,7 +6,7 @@ echo "Note: Run ./install-operators.sh first if you haven't already"
 echo ""
 
 echo "Step 1: Installing User Workload Monitoring..."
-helm upgrade --install uwm helm/uwm/
+helm upgrade --install uwm helm/uwm/ -n vss
 echo ""
 
 echo "Step 2: Installing OTEL Collector..."

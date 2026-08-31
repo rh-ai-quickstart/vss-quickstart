@@ -1,6 +1,6 @@
 apiVersion: v2
 name: uwm
-description: User Workload Monitoring for VSS NIM model serving metrics
+description: User Workload Monitoring for VSS KServe model serving metrics
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
@@ -8,5 +8,5 @@ keywords:
   - monitoring
   - prometheus
   - podmonitor
-  - nim
+  - kserve
   - vss

@@ -14,7 +14,7 @@ datasources:
     isDefault: true
 
 dashboards:
-  nimMetrics:
+  modelMetrics:
     enabled: true
 
 serviceAccount:

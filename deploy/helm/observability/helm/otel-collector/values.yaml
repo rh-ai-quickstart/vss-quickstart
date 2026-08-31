@@ -1,7 +1,10 @@
 global:
   namespace: observability-hub
-  # VSS application namespace — used to build scrape target FQDNs
-  vssNamespace: vss
+
+# Naming overrides consumed by the chart helpers.
+common:
+  nameOverride: ""
+  fullnameOverride: ""
 
 serviceAccount:
   create: true
@@ -28,20 +31,10 @@ collector:
       debug:
         verbosity: basic
 
+    # Model serving metrics (vLLM /metrics) are scraped by OpenShift User
+    # Workload Monitoring via the PodMonitors in the uwm chart, not here.
+    # This collector only handles OTLP telemetry pushed to it.
     receivers:
-      prometheus:
-        config:
-          scrape_configs:
-            - job_name: nim-nemotron-metrics
-              scrape_interval: 15s
-              static_configs:
-                - targets:
-                    - 'nvidia-nemotron-nano-9b-v2.vss.svc.cluster.local:8000'
-            - job_name: nim-cosmos3-metrics
-              scrape_interval: 15s
-              static_configs:
-                - targets:
-                    - 'nvidia-cosmos3-reasoner.vss.svc.cluster.local:8000'
       otlp:
         protocols:
           grpc:
@@ -63,7 +56,6 @@ collector:
         metrics:
           receivers:
             - otlp
-            - prometheus
           processors:
             - batch
             - memory_limiter
