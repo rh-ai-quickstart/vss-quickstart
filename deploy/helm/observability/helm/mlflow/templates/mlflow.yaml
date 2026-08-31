@@ -1,0 +1,7 @@
+apiVersion: mlflow.opendatahub.io/v1
+kind: MLflow
+metadata:
+  name: {{ .Values.mlflow.name }}
+  namespace: {{ .Values.mlflow.namespace }}
+spec:
+  {{- toYaml .Values.mlflow.spec | nindent 2 }}

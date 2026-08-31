@@ -18,7 +18,7 @@ helm upgrade --install grafana helm/grafana/ -n observability-hub
 echo ""
 
 echo "Step 4: Installing MLflow..."
-helm upgrade --install mlflow helm/mlflow/ -n vss
+helm upgrade --install mlflow helm/mlflow/ -n redhat-ods-applications
 echo ""
 
 echo "Observability resources deployed successfully!"
@@ -27,4 +27,4 @@ echo "Check status with:"
 echo "  oc get pods -n observability-hub"
 echo "  oc get grafana -n observability-hub"
 echo "  oc get opentelemetrycollector -n observability-hub"
-echo "  oc get pods -n vss -l app=mlflow"
+echo "  oc get mlflow -n redhat-ods-applications"

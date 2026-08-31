@@ -1,5 +1,5 @@
 apiVersion: v2
 name: mlflow
 version: 1.0.0
-description: Standalone MLflow tracking server for VSS pipeline tracing
+description: MLflow tracking server for OpenShift AI
 type: application

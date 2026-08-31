@@ -1,38 +1,33 @@
-# MLflow standalone instance configuration
+# MLflow instance configuration
 mlflow:
-  # Name used for all resources (deployment, service, route, PVC)
-  name: vss-mlflow
+  # Whether to create the MLflow CR
+  create: true
 
-  # Storage configuration
-  storage:
-    storageClassName: nfs-client
-    accessModes:
-      - ReadWriteOnce
-    size: 20Gi
+  # Name of the MLflow instance
+  name: mlflow
 
-  # Image configuration
-  image:
-    repository: ghcr.io/mlflow/mlflow
-    tag: v3.0.0
-    pullPolicy: IfNotPresent
+  # Namespace where MLflow will be deployed
+  namespace: redhat-ods-applications
 
-  # Resource requests and limits
-  resources:
-    requests:
-      cpu: 100m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
+  # MLflow CR spec
+  spec:
+    # Storage configuration
+    storage:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
 
-  # Service configuration
-  service:
-    port: 5000
-    type: ClusterIP
+    # Backend store URI (metadata storage)
+    backendStoreUri: "sqlite:////mlflow/mlflow.db"
 
-  # OpenShift Route configuration
-  route:
-    enabled: true
-    tls:
-      termination: edge
-      insecureEdgeTerminationPolicy: Redirect
+    # Artifacts destination (model artifacts storage)
+    artifactsDestination: "file:///mlflow/artifacts"
+
+    # Enable artifact serving
+    serveArtifacts: true
+
+    # Image configuration
+    image:
+      imagePullPolicy: IfNotPresent
