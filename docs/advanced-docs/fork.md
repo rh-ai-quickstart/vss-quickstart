@@ -2,7 +2,23 @@
 
 This document tracks all modifications made on top of the [upstream NVIDIA VSS Blueprint](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) to support deployment on Red Hat OpenShift AI.
 
-Upstream submodule: `upstream/vss/` → [rh-ai-quickstart fork](https://github.com/rh-ai-quickstart/nvidia-video-search-and-summarization) (v3.2.0 base, tracking OpenShift integration). Deployed charts in `deploy/helm/` are at **v3.2.1** image tags.
+Deployed charts in `deploy/helm/` are at **v3.2.1** image tags.
+
+---
+
+## Source model
+
+This repo draws from two upstreams, on purpose:
+
+- **NVIDIA VSS** — the `upstream/vss/` submodule, pinned to a release tag (currently **v3.2.1**). Source of engine/app code; our source-level changes are kept as patches in [`patches/vss-engine/`](../../patches/vss-engine/) and applied at build time.
+- **Red Hat VSS fork** ([`rh-ai-quickstart/nvidia-video-search-and-summarization`](https://github.com/rh-ai-quickstart/nvidia-video-search-and-summarization)) — tracked via the `upstream` git remote, to align with their OpenShift/RHOAI deployment work.
+
+The submodule is shared automatically via `.gitmodules` (`git submodule update --init`). Git remotes are of course not cloned, so you can add the Red Hat remote after cloning to reference the OpenShift compatibility work:
+
+```bash
+git remote add upstream https://github.com/rh-ai-quickstart/nvidia-video-search-and-summarization.git
+git fetch upstream
+```
 
 ---
 
