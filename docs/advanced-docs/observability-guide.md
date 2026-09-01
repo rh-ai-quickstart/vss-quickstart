@@ -17,15 +17,17 @@ This guide covers the observability stack for VSS on OpenShift, providing metric
 
 ```
 KServe model pods (nemotron, cosmos3)
-  ├── /metrics endpoint
-  │     └── scraped by → Prometheus (via PodMonitors/UWM)
-  │                         └── queried by → Grafana dashboards
-  └── inference calls
-        └── traced by → MLflow (experiment tracking)
+  └── /metrics endpoint
+        └── scraped by → Prometheus (via PodMonitors/UWM)
+                           └── queried by → Grafana dashboards
+
+vss-agent pod (NAT: VLM captioning, summarization, orchestration)
+  └── OTLP spans
+        └── exported directly to → MLflow /v1/traces → MLflow UI
 ```
 
 - **Metrics path**: model pods expose `/metrics` → PodMonitors tell UWM Prometheus to scrape them → Grafana queries Prometheus via the Thanos Querier
-- **Traces path**: Application code sends traces to MLflow tracking server → viewable in MLflow UI
+- **Traces path**: the vss-agent emits OTLP spans straight to the MLflow tracking server's `/v1/traces` endpoint (with RHOAI auth headers) → viewable in the MLflow UI. See [Tracing VSS into MLflow](#tracing-vss-into-mlflow).
 
 ## Prerequisites
 
@@ -112,6 +114,60 @@ Deployed as an `MLflow` CR (`mlflow.opendatahub.io/v1`) reconciled by the OpenSh
 - **Access**: Route created by the operator; auth via the cluster's OpenShift OAuth
 
 The CR spec is rendered verbatim from `mlflow.spec` in `values.yaml`, so any operator-supported field can be set there.
+
+## Tracing VSS into MLflow
+
+The vss-agent runs the whole summarization pipeline and exports OTLP spans
+directly to MLflow. Tracing is enabled automatically when
+`global.openshift.enabled` is true; you only supply the target experiment and an
+auth token. The agent image must include the tracing plugin — deploy the
+pre-built image, or build one per [`patches/vss-agent/README.md`](../../patches/vss-agent/README.md).
+
+1. **Create the experiment.** In the MLflow UI (Route from step 3 above),
+   create an experiment and note its numeric **experiment ID** (shown in the URL
+   / experiment header).
+
+2. **Get the endpoint.** Confirm the in-cluster tracking server address:
+
+   ```bash
+   oc get svc -n redhat-ods-applications | grep mlflow
+   ```
+
+3. **Extract the token.** The chart creates a long-lived service-account token
+   Secret (`vss-mlflow-token`, bound to the namespace `default` SA the agent
+   runs as):
+
+   ```bash
+   oc get secret vss-mlflow-token -n <namespace> -o jsonpath='{.data.token}' | base64 -d
+   ```
+
+4. **Wire it up** in `developer-profiles/dev-profile-base/values-openshift.yaml`
+   under `agent.vss-agent.extraEnv`:
+
+   | Var | Value |
+   |-----|-------|
+   | `MLFLOW_TRACING_ENDPOINT` | the Service URL from step 2 (e.g. `https://mlflow.redhat-ods-applications.svc.cluster.local:8443`) |
+   | `MLFLOW_EXPERIMENT_ID` | the ID from step 1 |
+   | `MLFLOW_WORKSPACE` | the install namespace (e.g. `vss`) |
+   | `MLFLOW_TOKEN` | the token from step 3 |
+
+5. **Apply and restart:**
+
+   ```bash
+   helm upgrade vss . -f values-base.yaml -f values-openshift.yaml ...
+   oc rollout restart deploy/vss-agent -n <namespace>
+   ```
+
+6. **Verify.** Run a video summarization, then open the experiment in the MLflow
+   UI — traces for the run (VLM captioning, summarization, orchestration) should
+   appear.
+
+> **NGC-path CA caveat:** on the KServe path the agent trusts the OpenShift
+> service-CA signer (via `extraCAConfigMaps: [vss-service-ca]`), so it verifies
+> MLflow's service-CA-signed cert. On the NGC path (`values-ngc.yaml` resets
+> `extraCAConfigMaps: []`) that signer isn't in the agent's trust bundle; if
+> MLflow serves a service-CA cert there, re-add `vss-service-ca` to
+> `extraCAConfigMaps` so the agent trusts it.
 
 ## Uninstall
 

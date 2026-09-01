@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
   config.yml: |
-{{ .Files.Get "configs/vss-agent/config.yml" | nindent 4 }}
+{{ tpl (.Files.Get "configs/vss-agent/config.yml") . | nindent 4 }}
 {{- if .Files.Glob "configs/vss-agent/config_edge.yml" }}
   config_edge.yml: |
 {{ (.Files.Get "configs/vss-agent/config_edge.yml") | nindent 4 }}

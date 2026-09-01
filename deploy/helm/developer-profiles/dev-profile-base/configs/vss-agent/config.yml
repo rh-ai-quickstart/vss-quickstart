@@ -42,6 +42,25 @@ general:
         # weave:
         #   _type: weave
         #   project: ${WEAVE_PROJECT}
+      # RHOAI MLflow tracing (OpenShift only). Uses our otelcollector_redaction
+      # exporter (see patches/vss-agent/) to attach the auth + routing headers
+      # MLflow needs. The vss-agent pod runs the whole pipeline (VLM captioning,
+      # summarization, orchestration), so this one exporter captures it all.
+      # Traces land in the experiment whose ID matches x-mlflow-experiment-id.
+      # This block is rendered only when global.openshift.enabled (the config is
+      # templated via tpl in templates/vss-agent-configmap.yaml). Values come from
+      # agent.vss-agent.extraEnv in values-openshift.yaml.
+{{- if .Values.global.openshift.enabled }}
+      mlflow:
+        _type: otelcollector_redaction
+        endpoint: ${MLFLOW_TRACING_ENDPOINT}/v1/traces
+        project: ${MLFLOW_PROJECT:-vss-agent}
+        headers:
+          x-mlflow-experiment-id: ${MLFLOW_EXPERIMENT_ID}
+          x-mlflow-workspace: ${MLFLOW_WORKSPACE}
+          Authorization: Bearer ${MLFLOW_TOKEN}
+        redaction_enabled: true
+{{- end }}
 
 object_stores:
   local_object_store:

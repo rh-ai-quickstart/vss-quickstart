@@ -1,0 +1,25 @@
+From 4b529e66b524909960b9bfb735a02d6c265bff1d Mon Sep 17 00:00:00 2001
+From: vss-quickstart <noreply@localhost>
+Date: Tue, 1 Sep 2026 19:01:24 -0400
+Subject: [PATCH] Register VSS observability telemetry exporter
+ (otelcollector_redaction)
+
+---
+ services/agent/pyproject.toml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/services/agent/pyproject.toml b/services/agent/pyproject.toml
+index 8da4037a2..eeed53bd0 100644
+--- a/services/agent/pyproject.toml
++++ b/services/agent/pyproject.toml
+@@ -164,6 +164,7 @@ vss_orchestrator_mcp = "vss_agents.orchestrator.tools"
+ vss_evaluators = "vss_agents.evaluators.register"
+ vst_tools = "vss_agents.tools.vst.register"
+ vss_knowledge_layer = "vss_agents.register_knowledge_layers"
++vss_observability = "vss_agents.observability.register"
+ 
+ 
+ 
+-- 
+2.39.5 (Apple Git-154)
+
