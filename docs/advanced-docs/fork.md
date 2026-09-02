@@ -75,7 +75,8 @@ On-cluster model serving via KServe instead of the NIM Operator:
 |-----|----------|
 | Deployment guide | [`docs/advanced-docs/deployment-guide.md`](deployment-guide.md) |
 | Observability stack | [`docs/advanced-docs/observability-guide.md`](observability-guide.md) |
-| Agent patches / build | [`patches/vss-agent/README.md`](../../patches/vss-agent/README.md) |
+| Customization / building images | [`docs/advanced-docs/customization-reference.md`](customization-reference.md) |
+| Agent patches | [`patches/vss-agent/README.md`](../../patches/vss-agent/README.md) |
 | Fork tracking | this file |
 
 ---

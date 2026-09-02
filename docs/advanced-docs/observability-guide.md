@@ -121,7 +121,8 @@ The vss-agent runs the whole summarization pipeline and exports OTLP spans
 directly to MLflow. Tracing is enabled automatically when
 `global.openshift.enabled` is true; you only supply the target experiment and an
 auth token. The agent image must include the tracing plugin — deploy the
-pre-built image, or build one per [`patches/vss-agent/README.md`](../../patches/vss-agent/README.md).
+pre-built image, or build one per
+[customization-reference.md](customization-reference.md#building-custom-images).
 
 1. **Create the experiment.** In the MLflow UI (Route from step 3 above),
    create an experiment and note its numeric **experiment ID** (shown in the URL
@@ -151,10 +152,10 @@ pre-built image, or build one per [`patches/vss-agent/README.md`](../../patches/
    | `MLFLOW_WORKSPACE` | the install namespace (e.g. `vss`) |
    | `MLFLOW_TOKEN` | the token from step 3 |
 
-5. **Apply and restart:**
+5. **Apply and restart.** Re-run the `helm upgrade --install` from the
+   [README Install section](../../README.md#install), then roll the agent:
 
    ```bash
-   helm upgrade vss . -f values-base.yaml -f values-openshift.yaml ...
    oc rollout restart deploy/vss-agent -n <namespace>
    ```
 

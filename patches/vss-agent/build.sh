@@ -7,7 +7,7 @@
 # committed.
 #
 # Usage:
-#   ./build.sh                       # docker buildx build -> vss-agent:latest
+#   ./build.sh                       # podman build -> vss-agent:latest
 #   IMAGE=my/vss-agent:dev ./build.sh
 set -euo pipefail
 
@@ -42,6 +42,16 @@ cp "$PATCH_DIR/observability/__init__.py" \
    "$PATCH_DIR/observability/register.py" \
    "$OBS/"
 
-# 3. Build. Context is services/; the Dockerfile COPYs with an agent/ prefix.
-docker buildx build --platform linux/amd64 \
-    -f agent/docker/Dockerfile -t "$IMAGE" --load "$SERVICES"
+# 3. Make NVIDIA's Dockerfile build under podman/buildah (reverted on exit when
+#    the submodule is reset). Two BuildKit-isms buildah rejects:
+#      - cache-mount sharing=private (buildah only knows shared|locked)
+#      - --chown=root:root into the distroless runtime stage, which has no
+#        /etc/passwd to resolve the name "root" (numeric 0:0 always works)
+sed -i.bak -e 's/sharing=private/sharing=locked/g' \
+           -e 's/--chown=root:root/--chown=0:0/g' \
+           "$AGENT/docker/Dockerfile"
+rm -f "$AGENT/docker/Dockerfile.bak"
+
+# 4. Build. Context is services/; the Dockerfile COPYs with an agent/ prefix.
+podman build --platform linux/amd64 \
+    -f "$AGENT/docker/Dockerfile" -t "$IMAGE" "$SERVICES"

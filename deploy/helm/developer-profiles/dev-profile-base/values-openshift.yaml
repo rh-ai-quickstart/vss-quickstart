@@ -86,6 +86,10 @@ ngc:
 # model without auth). NGC path replaces this extraEnv list (see values-ngc.yaml).
 agent:
   vss-agent:
+    image:
+      repository: quay.io/tasmith/vss-agent
+      tag: mlflow
+      pullPolicy: Always
     extraEnv:
       - name: VLM_MODEL_TYPE
         value: "vllm"
