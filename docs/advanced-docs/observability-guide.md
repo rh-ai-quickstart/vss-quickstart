@@ -213,13 +213,13 @@ Traces not appearing? Work through:
      curl -k https://mlflow.redhat-ods-applications.svc.cluster.local:8443/health
    ```
 
-5. **NGC-path CA caveat** — on the KServe path the agent trusts the OpenShift
-   service-CA signer (via `extraCAConfigMaps: [vss-service-ca]`), so it verifies
-   MLflow's service-CA-signed cert. On the NGC path (`values-ngc.yaml` resets
-   `extraCAConfigMaps: []`) that signer isn't in the agent's trust bundle; if
-   MLflow serves a service-CA cert there, re-add `vss-service-ca` to
-   `extraCAConfigMaps` so the agent trusts it (a TLS/`local issuer` error in the
-   agent logs points here).
+5. **MLflow TLS trust** — MLflow serves a cert signed by the OpenShift service-CA
+   signer. The agent verifies it via `OTEL_EXPORTER_OTLP_CERTIFICATE`, which points
+   at the combined trust bundle that includes `vss-service-ca` (the injected signer);
+   both are wired on every openshift path. A `CERTIFICATE_VERIFY_FAILED` /
+   `self-signed certificate in certificate chain` on `/v1/traces` means the OTLP
+   cert env or `vss-service-ca` didn't render — confirm `oc get cm vss-service-ca -n vss`
+   exists and that `OTEL_EXPORTER_OTLP_CERTIFICATE` is set in the agent pod.
 
 ## Uninstall
 

@@ -20,28 +20,18 @@ openshift:
 
 # Point agent to NGC cloud endpoints
 global:
-  # NGC cloud endpoints are public HTTPS covered by the cluster trust bundle, and the
-  # vss-service-ca ConfigMap isn't created on this path. Reset the KServe extra CAs
-  # (set in values-openshift.yaml) so the agent skips the combine initContainer and
-  # mounts the cluster bundle directly.
+  # NGC model endpoints are public HTTPS (covered by the cluster bundle), but the
+  # RHOAI MLflow endpoint uses a service-CA cert, so keep vss-service-ca in the
+  # combined bundle even on this path (OTEL_EXPORTER_OTLP_CERTIFICATE points at it).
   openshift:
     trustedCA:
-      extraCAConfigMaps: []
+      extraCAConfigMaps:
+        - name: vss-service-ca
+          key: service-ca.crt
   llmBaseUrl: "https://integrate.api.nvidia.com"
   vlmBaseUrl: "https://integrate.api.nvidia.com"
-  llmName: "nvidia/nvidia-nemotron-nano-9b-v2"
-  # VLM for NGC cloud (serverless integrate.api.nvidia.com).
-  #
-  # We use nemotron-nano-12b-v2-vl rather than the local-deploy default
-  # (cosmos3-nano-reasoner): the Cosmos-3 family is entitlement-gated on the
-  # serverless endpoint and returns 404 "Not found for account" for a standard
-  # NGC developer key, whereas nemotron-nano-12b-v2-vl is available by default.
-  # The VSS video_understanding tool's remote path samples JPEG frames and sends
-  # them as base64 images (not a video_url), so any image-capable VL model works;
-  # this one accepts image+video input over the OpenAI-compatible chat API and
-  # pairs with the Nemotron LLM above. For on-cluster (KServe) deploys,
-  # keep Cosmos3-Reasoner — see values-openshift.yaml.
-  vlmName: "nvidia/nemotron-nano-12b-v2-vl"
+  llmName: "nvidia/nemotron-nano-3-30b-a3b"
+  vlmName: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 
 # Pass NGC API key to the agent for cloud inference auth
 agent:
@@ -51,6 +41,9 @@ agent:
         value: "SET_VIA_HELM_SET"
       - name: OPENAI_API_KEY
         value: "SET_VIA_HELM_SET"
+      # Verify MLflow's service-CA cert (OTLP exporter ignores REQUESTS_CA_BUNDLE).
+      - name: OTEL_EXPORTER_OTLP_CERTIFICATE
+        value: /etc/pki/tls/custom-certs/ca-bundle.crt
       # NGC cloud = remote VLM, so the agent downloads + OpenCV-decodes MP4s locally
       # (video_understanding frame_select). On-cluster paths decode on GPU and keep this false.
       - name: INSTALL_PROPRIETARY_CODECS

@@ -97,6 +97,10 @@ agent:
         value: "EMPTY"
       # MLflow tracing is configured as literals in configs/vss-agent/config.yml
       # (general.telemetry.tracing.mlflow) — see the observability guide.
+      # OTLP exporter ignores REQUESTS_CA_BUNDLE (defaults to certifi), so point it
+      # at the combined trust bundle to verify MLflow's service-CA cert.
+      - name: OTEL_EXPORTER_OTLP_CERTIFICATE
+        value: /etc/pki/tls/custom-certs/ca-bundle.crt
 
 # -- VIOS: pod affinity + GPU tolerations ------------------------------------
 # NOTE: vss-vios-sensor defines the &gpu-tolerations anchor reused by all GPU

@@ -1,25 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# =====================================================================
-# OpenShift service-CA bundle for the vss-agent (KServe path only).
-#
-# KServe gives each on-cluster LLMInferenceService a serving cert issued
-# by the OpenShift service-CA signer (openshift-service-serving-signer),
-# and vLLM serves HTTPS with it. The agent calls those model endpoints
-# over https://<svc>.<ns>.svc:8000, so it must trust that signer — a
-# single CA that covers every service cert in the cluster (no per-model
-# secret list to keep in sync).
-#
-# This ConfigMap is created empty but annotated so the OpenShift
-# service-CA operator injects the signer's cert into its `service-ca.crt`
-# key. The agent's build-ca-bundle initContainer concatenates it with the
-# CNO-managed cluster bundle (vss-combined-ca) into the file SSL_CERT_FILE
-# points at (see global.openshift.trustedCA.extraCAConfigMaps and
-# services/agent/charts/agent). We intentionally do NOT set `data:` — the
-# service-CA operator owns that key.
-# =====================================================================
-{{- if and .Values.global.openshift.enabled .Values.openshift.ai.useKserve }}
+# Empty ConfigMap annotated so the service-CA operator injects the signer
+# (openshift-service-serving-signer) into service-ca.crt. The agent trusts it to
+# reach KServe models AND the RHOAI MLflow endpoint over HTTPS, so it's created on
+# every openshift path (MLflow tracing needs it even when useKserve is false). Do
+# NOT set data: — the operator owns that key.
+{{- if .Values.global.openshift.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
