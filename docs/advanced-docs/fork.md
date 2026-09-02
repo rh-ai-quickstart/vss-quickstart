@@ -40,7 +40,7 @@ the RHOAI auth headers (no OTel collector in the path). See
 | Header-capable NAT exporter | `patches/vss-agent/observability/*.py` | Done — registers an `otelcollector_redaction` tracing type; nat's built-in `otelcollector` has no `headers` field, so it can't send the `x-mlflow-*` / `Authorization` headers RHOAI MLflow needs. `COPY`'d into the agent image at build. |
 | Entry-point patch | `patches/vss-agent/0001-*.patch` | Done — adds one `nat.components` entry point to the agent's `pyproject.toml` (NVIDIA file). |
 | MLflow tracer config | `developer-profiles/dev-profile-base/configs/vss-agent/config.yml` | Done — `mlflow` tracer under `general.telemetry.tracing`, gated by `global.openshift.enabled` (config map uses `tpl`). |
-| Agent env + token wiring | `developer-profiles/dev-profile-base/values-openshift.yaml`, `templates/mlflow-token-secret.yaml` | Done — `MLFLOW_*` vars via `agent.vss-agent.extraEnv`; long-lived SA token from `vss-mlflow-token` Secret (pasted into `MLFLOW_TOKEN`). |
+| Tracer config + token | `developer-profiles/dev-profile-base/configs/vss-agent/config.yml`, `templates/mlflow-token-secret.yaml` | Done — endpoint / experiment-id / workspace / token are literals in the `mlflow` tracer block (rh-research aiq-rh pattern); long-lived SA token from `vss-mlflow-token` Secret pasted into the `Authorization` header. |
 | MLflow tracking server | `deploy/helm/observability/helm/mlflow/` | Done — RHOAI MLflow operator CR. |
 
 ### OpenShift platform support

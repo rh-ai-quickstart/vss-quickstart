@@ -95,31 +95,8 @@ agent:
         value: "vllm"
       - name: OPENAI_API_KEY
         value: "EMPTY"
-      # -- RHOAI MLflow tracing ------------------------------------------------
-      # The vss-agent pod runs the whole pipeline (VLM captioning, summarization,
-      # orchestration), so these vars feed the mlflow tracer in
-      # configs/vss-agent/config.yml and capture all of it in one experiment.
-      # See docs/advanced-docs/observability-guide.md for the full flow.
-      #
-      # endpoint: the in-cluster RHOAI MLflow tracking server (service-CA TLS).
-      # Confirm the Service name/port for your cluster:
-      #   oc get svc -n redhat-ods-applications | grep mlflow
-      - name: MLFLOW_TRACING_ENDPOINT
-        value: "https://mlflow.redhat-ods-applications.svc.cluster.local:8443"
-      # x-mlflow-workspace must equal the install namespace (here: vss).
-      - name: MLFLOW_WORKSPACE
-        value: "vss"
-      # x-mlflow-experiment-id: create the experiment in the MLflow UI first,
-      # then set this to its numeric ID (see the observability guide).
-      - name: MLFLOW_EXPERIMENT_ID
-        value: "1"
-      - name: MLFLOW_PROJECT
-        value: "vss-agent"
-      # Bearer token for MLflow. Extract from the token Secret and paste here
-      # (or pass with --set-string), e.g.:
-      #   oc get secret vss-mlflow-token -n vss -o jsonpath='{.data.token}' | base64 -d
-      - name: MLFLOW_TOKEN
-        value: "PASTE_MLFLOW_TOKEN_HERE"
+      # MLflow tracing is configured as literals in configs/vss-agent/config.yml
+      # (general.telemetry.tracing.mlflow) — see the observability guide.
 
 # -- VIOS: pod affinity + GPU tolerations ------------------------------------
 # NOTE: vss-vios-sensor defines the &gpu-tolerations anchor reused by all GPU
@@ -177,21 +154,7 @@ rtvi:
     #     nvidia.com/mig-2g.24gb: 1
 
 # -- KServe model serving (on-cluster models via RHOAI) ----------------------
-# When useKserve is true, templates/openshift-ai.yaml renders one
-# LLMInferenceService per model below. KServe's storage-initializer pulls
-# the weights straight from model.uri (hf://<repoId> by default) into
-# /mnt/models — no download Job or PVC.
-#
-# Per model:
-#   repoId       HuggingFace repo (org/name) -> hf://<repoId>. Must be a real HF
-#                repo; override the whole URI with `modelUri:` for pvc://, s3://, oci://.
-#   servedName   optional OpenAI-API model id (defaults to repoId).
-#   hfTokenSecret / hfTokenKey  secret + key holding HF_TOKEN for gated repos
-#                (defaults hf-token-secret / HF_TOKEN). Create this secret in the
-#                release namespace before install for any gated model. Both default
-#                models below are public/ungated, so no HF token is required.
-#   runtimeImage vLLM serving image. The LLM uses the Red Hat rhaii vLLM image;
-#                the Cosmos3 VLM requires NVIDIA's cosmos3 vLLM build (see below).
+
 openshift:
   ai:
     useKserve: false

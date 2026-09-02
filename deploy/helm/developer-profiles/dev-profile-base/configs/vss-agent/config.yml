@@ -53,12 +53,13 @@ general:
 {{- if .Values.global.openshift.enabled }}
       mlflow:
         _type: otelcollector_redaction
-        endpoint: ${MLFLOW_TRACING_ENDPOINT}/v1/traces
-        project: ${MLFLOW_PROJECT:-vss-agent}
+        endpoint: https://mlflow.redhat-ods-applications.svc.cluster.local:8443/v1/traces
+        project: vss-agent
         headers:
-          x-mlflow-experiment-id: ${MLFLOW_EXPERIMENT_ID}
-          x-mlflow-workspace: ${MLFLOW_WORKSPACE}
-          Authorization: Bearer ${MLFLOW_TOKEN}
+          # Edit before deploying; see observability guide "Tracing VSS into MLflow".
+          x-mlflow-experiment-id: "1"
+          x-mlflow-workspace: "vss"
+          Authorization: "Bearer {YOUR_TOKEN_HERE}"
         redaction_enabled: true
 {{- end }}
 

@@ -117,58 +117,109 @@ The CR spec is rendered verbatim from `mlflow.spec` in `values.yaml`, so any ope
 
 ## Tracing VSS into MLflow
 
-The vss-agent runs the whole summarization pipeline and exports OTLP spans
-directly to MLflow. Tracing is enabled automatically when
-`global.openshift.enabled` is true; you only supply the target experiment and an
-auth token. The agent image must include the tracing plugin — deploy the
-pre-built image, or build one per
+The vss-agent runs the whole summarization pipeline (VLM captioning,
+summarization, orchestration) and exports OTLP spans directly to MLflow. Tracing
+is enabled automatically when `global.openshift.enabled` is true; you only supply
+the target experiment and an auth token. The agent image must include the tracing
+plugin — deploy the pre-built image, or build one per
 [customization-reference.md](customization-reference.md#building-custom-images).
 
-1. **Create the experiment.** In the MLflow UI (Route from step 3 above),
-   create an experiment and note its numeric **experiment ID** (shown in the URL
-   / experiment header).
+### Step 1: Extract the ServiceAccount token
 
-2. **Get the endpoint.** Confirm the in-cluster tracking server address:
+The chart creates a long-lived token Secret (`vss-mlflow-token`, bound to the
+namespace `default` SA the agent runs as). Extract it:
+
+```bash
+oc get secret vss-mlflow-token -n vss -o jsonpath='{.data.token}' | base64 -d
+```
+
+Copy this token value.
+
+### Step 2: Create an MLflow experiment
+
+Get the MLflow URL, open it, and create an experiment to receive traces:
+
+```bash
+oc get route -n redhat-ods-applications -l app=mlflow -o jsonpath='{.items[0].spec.host}'
+```
+
+1. Click **"+ Create Experiment"**
+2. Enter a **Name** (e.g. `vss-agent-traces`); leave other fields default
+3. Click **"Create"**
+4. Note the numeric **Experiment ID** (`1` if it's your first experiment)
+
+### Step 3: Update the config
+
+Edit the `mlflow` tracer in
+`deploy/helm/developer-profiles/dev-profile-base/configs/vss-agent/config.yml`
+(under `general.telemetry.tracing`) with the values from Steps 1–2:
+
+```yaml
+      mlflow:
+        _type: otelcollector_redaction
+        endpoint: https://mlflow.redhat-ods-applications.svc.cluster.local:8443/v1/traces
+        project: vss-agent
+        headers:
+          x-mlflow-experiment-id: "1"                 # from Step 2
+          x-mlflow-workspace: "vss"                   # your install namespace
+          Authorization: "Bearer eyJhbGciOi..."       # from Step 1
+        redaction_enabled: true
+```
+
+Confirm the endpoint Service/port for your cluster with
+`oc get svc -n redhat-ods-applications | grep mlflow`. The experiment ID must
+match the experiment created in Step 2. This block only renders when
+`global.openshift.enabled` is true.
+
+### Step 4: Upgrade and restart
+
+Re-run the `helm upgrade --install` from the
+[README Install section](../../README.md#install), then restart the agent so it
+reloads with the new env:
+
+```bash
+oc rollout restart deploy/vss-agent -n vss
+oc rollout status  deploy/vss-agent -n vss
+```
+
+### Step 5: Test trace collection
+
+Generate activity in the app:
+
+```bash
+oc get route vss-vss-ui -n vss -o jsonpath='{.spec.host}'
+```
+
+Open the UI, run a video summarization, then in the MLflow UI open your
+experiment — spans for the run (VLM captioning, summarization, orchestration)
+should appear under the **Traces** tab.
+
+### MLflow Connection Issues
+
+Traces not appearing? Work through:
+
+1. **Experiment ID matches** — `x-mlflow-experiment-id` in `config.yml` equals the ID in the MLflow UI.
+2. **Token is valid** — re-extract (Step 1); a placeholder or expired token gives `401/403`.
+3. **Check agent logs for OTLP errors:**
 
    ```bash
-   oc get svc -n redhat-ods-applications | grep mlflow
+   oc logs -n vss deploy/vss-agent | grep -iE "otlp|mlflow|trace|401|403"
    ```
 
-3. **Extract the token.** The chart creates a long-lived service-account token
-   Secret (`vss-mlflow-token`, bound to the namespace `default` SA the agent
-   runs as):
+4. **Test connectivity from the vss namespace:**
 
    ```bash
-   oc get secret vss-mlflow-token -n <namespace> -o jsonpath='{.data.token}' | base64 -d
+   oc run -it --rm debug --image=curlimages/curl --restart=Never -n vss -- \
+     curl -k https://mlflow.redhat-ods-applications.svc.cluster.local:8443/health
    ```
 
-4. **Wire it up** in `developer-profiles/dev-profile-base/values-openshift.yaml`
-   under `agent.vss-agent.extraEnv`:
-
-   | Var | Value |
-   |-----|-------|
-   | `MLFLOW_TRACING_ENDPOINT` | the Service URL from step 2 (e.g. `https://mlflow.redhat-ods-applications.svc.cluster.local:8443`) |
-   | `MLFLOW_EXPERIMENT_ID` | the ID from step 1 |
-   | `MLFLOW_WORKSPACE` | the install namespace (e.g. `vss`) |
-   | `MLFLOW_TOKEN` | the token from step 3 |
-
-5. **Apply and restart.** Re-run the `helm upgrade --install` from the
-   [README Install section](../../README.md#install), then roll the agent:
-
-   ```bash
-   oc rollout restart deploy/vss-agent -n <namespace>
-   ```
-
-6. **Verify.** Run a video summarization, then open the experiment in the MLflow
-   UI — traces for the run (VLM captioning, summarization, orchestration) should
-   appear.
-
-> **NGC-path CA caveat:** on the KServe path the agent trusts the OpenShift
-> service-CA signer (via `extraCAConfigMaps: [vss-service-ca]`), so it verifies
-> MLflow's service-CA-signed cert. On the NGC path (`values-ngc.yaml` resets
-> `extraCAConfigMaps: []`) that signer isn't in the agent's trust bundle; if
-> MLflow serves a service-CA cert there, re-add `vss-service-ca` to
-> `extraCAConfigMaps` so the agent trusts it.
+5. **NGC-path CA caveat** — on the KServe path the agent trusts the OpenShift
+   service-CA signer (via `extraCAConfigMaps: [vss-service-ca]`), so it verifies
+   MLflow's service-CA-signed cert. On the NGC path (`values-ngc.yaml` resets
+   `extraCAConfigMaps: []`) that signer isn't in the agent's trust bundle; if
+   MLflow serves a service-CA cert there, re-add `vss-service-ca` to
+   `extraCAConfigMaps` so the agent trusts it (a TLS/`local issuer` error in the
+   agent logs points here).
 
 ## Uninstall
 
