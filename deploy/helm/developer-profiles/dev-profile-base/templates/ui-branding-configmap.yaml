@@ -16,9 +16,9 @@ metadata:
     component: ui-branding
 data:
   redhat-logo-white.svg: |-
-{{ .Files.Get "files/branding/redhat-logo-white.svg" | indent 4 }}
+{{ .Files.Get "files/branding/Logo-Red_Hat-A-Reverse-RGB.svg" | indent 4 }}
   redhat-logo-black.svg: |-
-{{ .Files.Get "files/branding/redhat-logo-black.svg" | indent 4 }}
+{{ .Files.Get "files/branding/Logo-Red_Hat-A-Standard-RGB.svg" | indent 4 }}
 binaryData:
   favicon.jpg: {{ .Files.Get "files/branding/favicon.jpg" | b64enc }}
 {{- end }}
