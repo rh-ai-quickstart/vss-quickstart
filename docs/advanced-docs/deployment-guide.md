@@ -275,3 +275,23 @@ When the LLM and VLM run outside the cluster — NGC cloud endpoints or HTTP end
 - `global.llmName` / `global.vlmName`: model identifiers (e.g. `nvidia/nvidia-nemotron-nano-9b-v2`, `nvidia/cosmos3-nano-reasoner`), aligned with what the endpoint serves.
 
 Per-agent overrides (`agent.vss-agent.llmBaseUrl`, `agent.vss-agent.vlmBaseUrl`, etc.) exist if the agent must differ from `global.*`.
+
+### Outbound TLS trust (handled automatically)
+
+The `vss-agent` calls NGC cloud over HTTPS (`https://integrate.api.nvidia.com`). On OpenShift the agent image ships only a minimal CA store, so without a cluster trust bundle these calls fail with `unable to get local issuer certificate` (and downstream LLM/VLM tool errors). `values-openshift.yaml` handles this for you via `global.openshift.trustedCA`:
+
+- `templates/openshift-trusted-ca.yaml` creates a ConfigMap (`vss-combined-ca`) labeled `config.openshift.io/inject-trusted-cabundle: "true"`. The OpenShift Cluster Network Operator populates its `ca-bundle.crt` with the full public-root + `user-ca-bundle` trust store (this also covers a corporate egress proxy that MITMs TLS).
+- The agent subchart mounts that bundle at `/etc/pki/tls/custom-certs` and sets `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` to point at it.
+
+No manual steps are required — it applies whenever `global.openshift.enabled` is true. To verify the bundle was injected and trust works:
+
+```bash
+# CNO should have populated the ca-bundle.crt key (non-empty)
+oc get configmap vss-combined-ca -n vss -o jsonpath='{.data.ca-bundle\.crt}' | head -c 60; echo
+
+# From the agent pod, confirm the endpoint's chain verifies against the mounted bundle
+oc exec deploy/vss-agent -n vss -- python -c \
+  "import ssl,socket; ctx=ssl.create_default_context(); ctx.wrap_socket(socket.socket(),server_hostname='integrate.api.nvidia.com').connect(('integrate.api.nvidia.com',443)); print('TLS OK')"
+```
+
+To disable (e.g. non-OpenShift, or you manage trust another way) set `global.openshift.trustedCA.enabled=false`.

@@ -1,10 +1,6 @@
-# Video Search and Summarization with Red Hat AI and NVIDIA
+# Analyze Manufacturing Video with Red Hat AI and NVIDIA
 
-Deploy NVIDIA's Video Search and Summarization AI blueprint on Red Hat AI Factory with NVIDIA, with NIM model serving, MIG GPU scheduling, and MLflow observability.
-
-> **Project home**
->
-> This repository is part of the [Red Hat AI Quickstarts](https://www.redhat.com/en/blog/introducing-ai-quickstarts) initiative. It extends the upstream [NVIDIA AI Blueprint: Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) with OpenShift AI deployment support and MLflow observability. See [Customization](#customization) for details on what this quickstart adds over upstream.
+Turn hours of production-floor video into searchable data - ask questions in natural language, powered by Red Hat AI Factory with NVIDIA.
 
 ## Table of Contents
 
@@ -24,17 +20,15 @@ Deploy NVIDIA's Video Search and Summarization AI blueprint on Red Hat AI Factor
 
 ## Detailed Description
 
-The NVIDIA AI Blueprint for Video Search and Summarization addresses the challenge of efficiently analyzing and summarizing large volumes of video data. Operations teams across manufacturing, logistics, and facilities management generate continuous video streams — from warehouse floors and production lines to loading docks and secure spaces — that are too voluminous to review manually. This quickstart enables teams to query that footage in natural language and receive accurate, cited summaries automatically.
+Manufacturing operations generate more video than any team can watch. Production lines, work cells, loading docks, and restricted areas stream footage around the clock, and the moments that matter — an unsafe behavior, a missed step, an anomaly on the line — are buried in hours of routine activity. This quickstart lets teams query that footage in natural language and get accurate summaries automatically, turning passive camera feeds into searchable operational insight. The same pipeline applies beyond the factory floor — logistics, facilities, and secure spaces — but this quickstart focuses on manufacturing safety and operations.
 
-The v3.2.1 blueprint deploys a microservices-based AI pipeline: a Vision Language Model (Cosmos3-Reasoner) captions each video frame, an LLM (Nemotron-Nano-9B-v2) generates summaries and handles chat, and infrastructure services (Redis, Kafka, Elasticsearch) support retrieval and event processing. Video I/O Services (VIOS) handle ingestion, decoding, and streaming. An agent layer with Model Context Protocol (MCP) orchestrates the pipeline, and a Real-Time Video Intelligence (RTVI) component enables live stream processing.
+Built on the [NVIDIA AI Blueprint for Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization), it deploys a complete AI pipeline on OpenShift: a vision model "watches" the footage and a language model turns what it sees into summaries and answers to your questions. Video ingestion, indexing, and orchestration run as managed services, so you upload a clip — or point at a live stream — and start asking questions, with no manual review required.
 
-Built as a customized version of the NVIDIA VSS Blueprint for Red Hat AI, this quickstart shows how enterprise-grade video analytics can run with NVIDIA NIM models on [Red Hat AI Factory with NVIDIA](https://www.redhat.com/en/products/ai/factory-with-nvidia). The quickstart adapts the upstream blueprint for Red Hat AI environments, adding OpenShift-compatible security contexts, composable Helm overlays, a KServe model serving option for RHOAI integration, and a full observability stack with OpenTelemetry, Grafana, and MLflow.
+This quickstart adapts the upstream blueprint for Red Hat AI environments, showing how enterprise-grade video analytics can run with NVIDIA NIM models on [Red Hat AI Factory with NVIDIA](https://www.redhat.com/en/products/ai/factory-with-nvidia). It adds OpenShift-compatible security contexts, composable Helm overlays, a KServe model serving option for RHOAI integration, and a full observability stack with OpenTelemetry, Grafana, and MLflow.
 
 ### Architecture Diagrams
 
 ![VSS architecture showing video ingestion, VLM captioning, and LLM summarization](deploy/images/vss_architecture.png)
-
-Video is decoded into chunks by VIOS. Each chunk is captioned by the Cosmos3 VLM and indexed into Elasticsearch. User queries flow through the agent layer to the Nemotron LLM, which returns cited summaries. Alerts fire when captions match user-defined keywords. The RTVI component enables real-time processing of live RTSP streams.
 
 ## Requirements
 
@@ -42,14 +36,10 @@ Video is decoded into chunks by VIOS. Each chunk is captioned by the Cosmos3 VLM
 
 #### GPU Requirements
 
-This deployment uses NVIDIA NIM model serving for GPU inference. The following requirements apply when models are deployed locally on your GPUs.
-
-**Models deployed on your cluster:**
-- **Nemotron-Nano-9B-v2 (LLM)**: ~25GB VRAM
-- **Cosmos3-Reasoner (VLM)**: ~85GB VRAM
+This deployment uses KServe model serving with vLLM for local inference. You may also choose optionally to point to NGC Cloud endpoints if you do not have local resources. The following requirements apply when models are deployed locally on your GPUs:
 
 **Standard deployment requirements (full GPUs, not using MIG):**
-- **2x NVIDIA H100** (80GB) or equivalent
+- **2x NVIDIA H100** (80GB) or equivalent [tested on H100s]
   - GPU 0: Cosmos3-Reasoner (VLM) — 1 GPU (~85GB)
   - GPU 1: Nemotron-Nano-9B-v2 (LLM) — 1 GPU (~25GB)
 
@@ -57,7 +47,7 @@ This deployment uses NVIDIA NIM model serving for GPU inference. The following r
 
 MIG allows you to partition GPUs into smaller slices, enabling multiple models to share a single GPU efficiently and reduce overall GPU requirements.
 
-NOTE: MIG examples are based on H100 MIG profiles
+NOTE: MIG examples in the deployment manifests are based on H100 MIG profiles
 
 - **With MIG**: 2x H100 GPUs minimum
   - GPU 0: 1x 7g.94gb (Cosmos3 VLM)
@@ -74,8 +64,8 @@ See the [Deployment Guide](docs/advanced-docs/deployment-guide.md) for detailed 
 ### Minimum Software Requirements
 
 - Red Hat OpenShift Container Platform (tested with v4.20)
-- Red Hat OpenShift AI v3.4 with KServe model serving configured
-- NVIDIA GPU Operator with MIG support enabled
+- Red Hat OpenShift AI (tested with v3.4) with KServe model serving configured
+- NVIDIA GPU Operator (optional: with MIG support enabled)
 - Helm CLI
 - OpenShift Client CLI (oc)
 
@@ -84,15 +74,14 @@ See the [Deployment Guide](docs/advanced-docs/deployment-guide.md) for detailed 
 - cluster-admin permissions (chart creates ServiceAccount, SCC RoleBinding, Route)
 - Ability to create PersistentVolumeClaims
 - Ability to create Secrets
-- For KServe deployment: permissions to create LLMInferenceServices (serving.kserve.io)
+- For KServe deployment: permissions to create LLMInferenceServices
 
 ## Deploy
 
-The following instructions will deploy the VSS quickstart to your Red Hat AI environment using Helm developer profiles with a composable OpenShift overlay.
+The following instructions will deploy the video search and summarization AI quickstart to your Red Hat AI environment using Helm.
 
 ### Prerequisites
 
-Before deployment, ensure you have the following in place:
 - OpenShift cluster with OpenShift AI installed (see version requirements above)
 - Helm CLI and OpenShift Client CLI (oc)
 - GPU nodes available with NVIDIA GPU Operator installed (required for on-cluster inference with KServe; not required for NGC cloud inference)
@@ -122,7 +111,7 @@ cd vss-quickstart
 git submodule update --init --recursive
 ```
 
-**Note:** The submodule points to the [rh-ai-quickstart fork](https://github.com/rh-ai-quickstart/nvidia-video-search-and-summarization) of the upstream NVIDIA VSS Blueprint, which tracks OpenShift integration work. The deployment uses the unpacked v3.2.1 charts in `deploy/helm/`.
+**Note:** The submodule points to the upstream NVIDIA VSS Blueprint. The deployment uses and modifies the v3.2.1 charts in `deploy/helm/`.
 
 2. Ensure you are logged into your OpenShift cluster as cluster-admin:
 
@@ -144,7 +133,7 @@ export APPS_DOMAIN=$(oc get ingress.config.openshift.io/cluster \
 oc new-project vss
 ```
 
-5. This quickstart ships the **`dev-profile-base`** developer profile — the core VSS pipeline (VLM captioning, LLM summary/chat, agent + UI) validated on OpenShift AI:
+5. This quickstart ships the **`dev-profile-base`** developer profile — the core VSS pipeline (VLM captioning, LLM summary/chat, agent + UI) validated on Red Hat AI Enterprise:
 
 ```
 dev-profile-base — Core pipeline + NIM models (LLM + VLM)
@@ -162,9 +151,9 @@ helm dependency build deploy/helm/developer-profiles/dev-profile-base/
 
 #### Option A: NGC Cloud Inference (no local GPUs for models)
 
-Uses NVIDIA-hosted NIM endpoints for LLM and VLM inference. Models run on NGC cloud; only the VSS pipeline services deploy on your cluster. This is the fastest way to evaluate the quickstart without provisioning GPU nodes for model serving.
+Uses NVIDIA-hosted NIM endpoints for LLM and VLM inference. Models run on NGC cloud; only the VSS pipeline services deploy on your cluster. This is the fastest way to deploy the AI quickstart without provisioning GPU nodes for model serving.
 
-**Cloud model selection.** `values-ngc.yaml` points the agent at `nvidia/nvidia-nemotron-nano-9b-v2` (LLM) and `nvidia/nemotron-nano-12b-v2-vl` (VLM) on `integrate.api.nvidia.com` — both available to a standard NGC developer key. The VLM differs from the on-cluster default (Cosmos3-Reasoner, used in Options B/C): the Cosmos-3 family is entitlement-gated on the serverless endpoint and returns `404 ... Not found for account` without a serverless entitlement. For remote inference the `video_understanding` tool samples JPEG frames and sends them as images, so any image-capable VL model works. Override with `--set global.vlmName=...` if your key is entitled to a different model.
+**Cloud model selection.** `values-ngc.yaml` points the agent at specific models on NGC cloud. Depending on model availability and selection with your individual NGC api key, you may swap out the models used. Just be sure to verify model functionality parity before changing them.
 
 ```bash
 helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
@@ -179,24 +168,6 @@ helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
 
 > `ngc.apiKey` backs the image-pull and NIM secrets; the two `extraEnv` overrides populate the agent's `NVIDIA_API_KEY` / `OPENAI_API_KEY` for cloud inference auth (they default to a placeholder in `values-ngc.yaml` so no real key is committed). All three are required for Option A.
 
-**Outbound TLS trust (handled automatically).** The `vss-agent` calls NGC cloud over HTTPS (`https://integrate.api.nvidia.com`). On OpenShift the agent image ships only a minimal CA store, so without a cluster trust bundle these calls fail with `unable to get local issuer certificate` (and downstream LLM/VLM tool errors). `values-openshift.yaml` handles this for you via `global.openshift.trustedCA`:
-
-- `templates/openshift-trusted-ca.yaml` creates a ConfigMap (`vss-combined-ca`) labeled `config.openshift.io/inject-trusted-cabundle: "true"`. The OpenShift Cluster Network Operator populates its `ca-bundle.crt` with the full public-root + `user-ca-bundle` trust store (this also covers a corporate egress proxy that MITMs TLS).
-- The agent subchart mounts that bundle at `/etc/pki/tls/custom-certs` and sets `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` to point at it.
-
-No manual steps are required — it applies whenever `global.openshift.enabled` is true. To verify the bundle was injected and trust works:
-
-```bash
-# CNO should have populated the ca-bundle.crt key (non-empty)
-oc get configmap vss-combined-ca -n vss -o jsonpath='{.data.ca-bundle\.crt}' | head -c 60; echo
-
-# From the agent pod, confirm the endpoint's chain verifies against the mounted bundle
-oc exec deploy/vss-agent -n vss -- python -c \
-  "import ssl,socket; ctx=ssl.create_default_context(); ctx.wrap_socket(socket.socket(),server_hostname='integrate.api.nvidia.com').connect(('integrate.api.nvidia.com',443)); print('TLS OK')"
-```
-
-To disable (e.g. non-OpenShift, or you manage trust another way) set `global.openshift.trustedCA.enabled=false`.
-
 #### Option B: Local Model Serving with KServe (models on your GPUs)
 
 Deploys models as KServe LLMInferenceServices managed by Red Hat OpenShift AI. Requires GPU nodes with NVIDIA GPU Operator and RHOAI with KServe model serving configured.
@@ -210,7 +181,7 @@ helm upgrade --install vss deploy/helm/developer-profiles/dev-profile-base/ \
   --set global.externalHost=vss.${APPS_DOMAIN}
 ```
 
-GPU pods may take 20-30 minutes on first deploy while model weights download. See the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-model-serving) for KServe configuration details and MIG GPU scheduling.
+See the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-model-serving) for KServe configuration details and MIG GPU scheduling.
 
 #### Verify Installation
 
@@ -223,10 +194,10 @@ oc get pods -n vss
 Get the UI URL:
 
 ```bash
-oc get route vss-ui -n vss -o jsonpath='{.spec.host}'
+oc get route vss-vss-ui -n vss -o jsonpath='{.spec.host}'
 ```
 
-Open `https://<route-host>` in a browser. Upload a video file or enter an RTSP stream URL to begin.
+Open `https://<route-host>` in a browser. Upload a video file and open the chat interface to begin.
 
 #### (Optional) Deploy Observability Stack
 
@@ -254,7 +225,7 @@ NOTE: For more detailed information on verifying the observability stack deploym
 
 ### Delete
 
-Uninstall the quickstart deployment:
+Uninstall the AI quickstart deployment:
 
 ```bash
 # Delete VSS application
@@ -277,15 +248,29 @@ chmod +x uninstall.sh
 ./uninstall.sh
 ```
 
-**Note:** After uninstalling, you may need to manually remove the User Workload Monitoring ConfigMap:
+Or manually uninstall in reverse order (resources first, then operators):
 
 ```bash
-oc delete configmap cluster-monitoring-config -n openshift-monitoring
+# Uninstall observability resources
+helm uninstall mlflow -n redhat-ods-applications
+helm uninstall logging-stack -n openshift-logging
+helm uninstall grafana -n observability-hub
+helm uninstall uwm
+helm uninstall otel-collector -n observability-hub
+
+# Clean up orphaned User Workload Monitoring ConfigMap (if it exists)
+oc delete configmap user-workload-monitoring-config -n openshift-user-workload-monitoring 2>/dev/null || true
+
+# Uninstall operators (this will also delete their namespaces)
+helm uninstall otel-op
+helm uninstall grafana-op
+helm uninstall cluster-obs
+helm uninstall logging-op
 ```
 
 ## Customization
 
-This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) as part of the [Red Hat AI Quickstarts](https://www.redhat.com/en/blog/introducing-ai-quickstarts) initiative, adding:
+This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) in support of the Red Hat AI Factory with NVIDIA joint solution:
 
 - **OpenShift AI deployment** — Per-profile `values-openshift.yaml` overlays with path-based Routes, custom SCCs (NIM SELinux relabel avoidance, VIOS anyuid), pod affinity, security context nulling for restricted-v2, and NGC secret creation. All OpenShift resources are gated by `global.openshift.enabled` and applied at install time.
 - **Two model serving options** — NGC cloud inference (`values-ngc.yaml` overlay, no local model GPUs) or KServe LLMInferenceServices via RHOAI (`openshift.ai.useKserve` flag). See [Install](#install) for usage and the [Deployment Guide](docs/advanced-docs/deployment-guide.md#kserve-model-serving) for KServe details.
@@ -293,13 +278,6 @@ This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://githu
 - **Observability stack** — OpenTelemetry Collector, Grafana with Prometheus dashboards, User Workload Monitoring with PodMonitors, and standalone MLflow tracking server. See the [Observability Guide](docs/advanced-docs/observability-guide.md).
 - **MLflow tracing** — Per-request pipeline telemetry logged to MLflow without rebuilding the container image (deferred to Phase 2 — see [Fork Customizations](docs/advanced-docs/fork.md)).
 - **Red Hat UI branding** — Logo, colors, and fonts replaced in the web UI (deferred to Phase 2 — see [Fork Customizations](docs/advanced-docs/fork.md)).
-
-### Quick Configuration Changes
-
-- **Model Serving Backend:** Layer `values-ngc.yaml` for NGC cloud inference, or set `openshift.ai.useKserve=true` for on-cluster KServe serving — see [Install](#install)
-- **Developer Profile:** Choose a different profile directory for additional capabilities (alerts, search, live video) — each has its own `values-openshift.yaml` with profile-specific component keys
-- **GPU Tolerations:** Edit the `&gpu-tolerations` anchor in the profile's `values-openshift.yaml` to match your node taints — all GPU workloads inherit it
-- **Model Selection:** Override NIM model images and resources in the profile's `values-openshift.yaml`
 
 ### Additional Resources
 
