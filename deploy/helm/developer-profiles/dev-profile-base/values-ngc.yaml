@@ -30,7 +30,7 @@ global:
           key: service-ca.crt
   llmBaseUrl: "https://integrate.api.nvidia.com"
   vlmBaseUrl: "https://integrate.api.nvidia.com"
-  llmName: "nvidia/nemotron-nano-3-30b-a3b"
+  llmName: "nvidia/nemotron-3-super-120b-a12b"
   vlmName: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 
 # Pass NGC API key to the agent for cloud inference auth
@@ -41,6 +41,13 @@ agent:
         value: "SET_VIA_HELM_SET"
       - name: OPENAI_API_KEY
         value: "SET_VIA_HELM_SET"
+      # Use openai-typed LLM/VLM profiles: the nim client leaks verify_ssl into the
+      # request body, which NGC serverless rejects (400 Unsupported parameter). vllm_vlm
+      # (not openai_vlm) keeps VLM_BASE_URL; openai_vlm would default to api.openai.com.
+      - name: LLM_MODEL_TYPE
+        value: "openai"
+      - name: VLM_MODEL_TYPE
+        value: "vllm"
       # Verify MLflow's service-CA cert (OTLP exporter ignores REQUESTS_CA_BUNDLE).
       - name: OTEL_EXPORTER_OTLP_CERTIFICATE
         value: /etc/pki/tls/custom-certs/ca-bundle.crt
