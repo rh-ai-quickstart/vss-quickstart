@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 AI quickstart
+#
+# =====================================================================
+# RBAC for MLflow tracing. RHOAI MLflow scopes experiments by workspace,
+# and the workspace maps to the install namespace. The vss-agent traces as
+# the namespace "default" SA (see mlflow-token-secret.yaml); this Role lets
+# that SA read/write experiments in this namespace's workspace, so a UI-
+# created experiment is reachable by the token. Without it the agent's span
+# export gets 403 PERMISSION_DENIED.
+# =====================================================================
+{{- if .Values.global.openshift.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vss-mlflow-integration
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: mlflow-tracing
+rules:
+- apiGroups: [mlflow.kubeflow.org]
+  resources: [experiments, datasets, registeredmodels]
+  verbs: [get, list, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vss-mlflow-integration
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: mlflow-tracing
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vss-mlflow-integration
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: {{ .Release.Namespace }}
+{{- end }}
