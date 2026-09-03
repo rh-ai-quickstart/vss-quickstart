@@ -286,7 +286,7 @@ vss-agent-ui:
     - name: NEXT_PUBLIC_ALERTS_TAB_VERIFIED_FLAG_DEFAULT
       value: "false"
     - name: NEXT_PUBLIC_APP_TITLE
-      value: "VSS BLUEPRINT"
+      value: "VSS AI Quickstart"
     - name: NEXT_PUBLIC_APP_SUBTITLE
       value: "Vision (Base)"
     - name: NEXT_PUBLIC_CHAT_API_CUSTOM_AGENT_PARAMS_JSON

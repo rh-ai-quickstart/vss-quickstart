@@ -157,6 +157,31 @@ rtvi:
     #     nvidia.com/gpu: 0
     #     nvidia.com/mig-2g.24gb: 1
 
+# -- UI: Red Hat branding (runtime, no image rebuild) ------------------------
+# Mount the vss-ui-branding ConfigMap (ui-branding-configmap.yaml) over the
+# stock NVIDIA logo/favicon via subPath so only those files are replaced and
+# the runtime-generated public/__ENV.js and other assets are preserved. Path is
+# the VSS app's runtime public dir (see services/ui/Dockerfile). Title is set in
+# values.yaml (NEXT_PUBLIC_APP_TITLE); subtitle is unchanged.
+vss-agent-ui:
+  extraVolumes:
+    - name: ui-branding
+      configMap:
+        name: vss-ui-branding
+  extraVolumeMounts:
+    - name: ui-branding
+      mountPath: /repo/apps/nv-metropolis-bp-vss-ui/apps/nv-metropolis-bp-vss-ui/public/NV-logo-white.svg
+      subPath: redhat-logo-white.svg
+      readOnly: true
+    - name: ui-branding
+      mountPath: /repo/apps/nv-metropolis-bp-vss-ui/apps/nv-metropolis-bp-vss-ui/public/NV-logo-black.svg
+      subPath: redhat-logo-black.svg
+      readOnly: true
+    - name: ui-branding
+      mountPath: /repo/apps/nv-metropolis-bp-vss-ui/apps/nv-metropolis-bp-vss-ui/public/favicon.jpg
+      subPath: favicon.jpg
+      readOnly: true
+
 # -- KServe model serving (on-cluster models via RHOAI) ----------------------
 
 openshift:

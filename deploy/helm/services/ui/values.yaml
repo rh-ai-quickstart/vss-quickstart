@@ -49,6 +49,9 @@ extraEnvFrom: []
 extraEnv: []
 # Optional: list of {name, value} env overrides (merged over chart `env` by name in deployment template). Parent uses for alerts profile.
 envOverrides: []
+# Optional: extra pod volumes / container mounts (parent profile values.yaml). Used for runtime UI branding (logo/favicon subPath mounts).
+extraVolumes: []
+extraVolumeMounts: []
 agentApiUrlBase: ""
 vstApiUrl: ""
 # Empty: NEXT_PUBLIC_*_HTTP_CHAT_* → http://<release>-vss-agent:8000/chat/stream

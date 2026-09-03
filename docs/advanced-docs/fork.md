@@ -68,7 +68,14 @@ On-cluster model serving via KServe instead of the NIM Operator:
 
 ### Red Hat branding
 
-**TODO — not yet ported.** The v3.2.1 frontend is the Next.js app in `services/ui/` (the v2.x Gradio client no longer exists upstream), so branding must be redone against that UI. The Red Hat fork's [`patches/aiq/0002`–`0003`](https://github.com/rh-ai-quickstart) runtime-branding-via-ConfigMap pattern is a good model.
+Runtime rebrand of the v3.2.1 Next.js UI (`services/ui/`, app `nv-metropolis-bp-vss-ui`) — no image rebuild.
+
+| Piece | Location | Status |
+|-------|----------|--------|
+| Title | `developer-profiles/dev-profile-base/values.yaml` (`NEXT_PUBLIC_APP_TITLE: "VSS AI Quickstart"`) | Done — served via `next-runtime-env` (`__ENV.js`). Subtitle unchanged (`Vision (Base)`). |
+| Logo + favicon assets | `developer-profiles/dev-profile-base/files/branding/{redhat-logo-white,redhat-logo-black}.svg`, `favicon.jpg` | Done — placeholder Red Hat wordmark SVGs; drop in the official logo SVG to update. |
+| Branding ConfigMap | `developer-profiles/dev-profile-base/templates/ui-branding-configmap.yaml` (`vss-ui-branding`) | Done — gated by `global.openshift.enabled`. |
+| Mount over stock assets | `developer-profiles/dev-profile-base/values-openshift.yaml` (`vss-agent-ui.extraVolume{s,Mounts}`) + UI subchart passthrough in `services/ui/templates/deployment.yaml` | Done — `subPath` mounts replace only the two NVIDIA logos + favicon, preserving runtime-generated `public/__ENV.js`. |
 
 ### Documentation
 

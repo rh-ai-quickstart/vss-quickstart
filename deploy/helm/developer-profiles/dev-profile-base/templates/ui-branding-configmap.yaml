@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 AI quickstart
+#
+# Red Hat UI branding assets, mounted over the vss-agent-ui image's static
+# assets (subPath mounts in values-openshift.yaml) so the logo/favicon change
+# with no image rebuild. Replace files under files/branding/ to customize.
+{{- if .Values.global.openshift.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vss-ui-branding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: ui-branding
+data:
+  redhat-logo-white.svg: |-
+{{ .Files.Get "files/branding/redhat-logo-white.svg" | indent 4 }}
+  redhat-logo-black.svg: |-
+{{ .Files.Get "files/branding/redhat-logo-black.svg" | indent 4 }}
+binaryData:
+  favicon.jpg: {{ .Files.Get "files/branding/favicon.jpg" | b64enc }}
+{{- end }}
