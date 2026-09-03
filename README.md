@@ -14,6 +14,7 @@ Turn hours of production-floor video into searchable data - ask questions in nat
   - [Prerequisites](#prerequisites)
   - [Install](#install)
   - [Delete](#delete)
+- [Using the Application](#using-the-application)
 - [Customization](#customization)
 - [References](#references)
 - [Tags](#tags)
@@ -28,7 +29,7 @@ This quickstart adapts the upstream blueprint for Red Hat AI environments, showi
 
 ### Architecture Diagrams
 
-![VSS architecture showing video ingestion, VLM captioning, and LLM summarization](deploy/images/vss_architecture.png)
+![VSS on Red Hat AI: video ingestion pipeline, VLM captioning and LLM summarization served via KServe or NGC, with an observability stack](deploy/images/rh_vss_architecture.png)
 
 ## Requirements
 
@@ -147,7 +148,7 @@ dev-profile-base — Core pipeline + NIM models (LLM + VLM)
 helm dependency build deploy/helm/developer-profiles/dev-profile-base/
 ```
 
-7. Install using one of the three model serving options below:
+7. Install using one of the two model serving options below:
 
 #### Option A: NGC Cloud Inference (no local GPUs for models)
 
@@ -267,6 +268,16 @@ helm uninstall grafana-op
 helm uninstall cluster-obs
 helm uninstall logging-op
 ```
+
+## Using the Application
+
+Sample manufacturing-safety clips are included under [`assets/videos/manufacturing/safety/`](assets/videos/manufacturing/safety/) — walkway violations, forklift overload, open/closed panel covers, and equipment intervention — to try the AI quickstart with. Upload one, then ask questions in natural language, for example:
+
+- "Summarize what happens in this video."
+- "Is the worker staying within the designated walkway?"
+- "How many blocks is the forklift carrying — is it overloaded?"
+
+For a full walkthrough — uploading, chatting, and more example questions to guide a demo — see the [Using the App guide](docs/user-docs/using-the-app.md).
 
 ## Customization
 
