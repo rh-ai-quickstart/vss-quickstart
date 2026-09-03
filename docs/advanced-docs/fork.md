@@ -41,6 +41,7 @@ the RHOAI auth headers (no OTel collector in the path). See
 | Entry-point patch | `patches/vss-agent/0001-*.patch` | Done — adds one `nat.components` entry point to the agent's `pyproject.toml` (NVIDIA file). |
 | MLflow tracer config | `developer-profiles/dev-profile-base/configs/vss-agent/config.yml` | Done — `mlflow` tracer under `general.telemetry.tracing`, gated by `global.openshift.enabled` (config map uses `tpl`). |
 | Tracer config + token | `developer-profiles/dev-profile-base/configs/vss-agent/config.yml`, `templates/mlflow-token-secret.yaml` | Done — endpoint / experiment-id / workspace / token are literals in the `mlflow` tracer block (rh-research aiq-rh pattern); long-lived SA token from `vss-mlflow-token` Secret pasted into the `Authorization` header. |
+| Tracing SA RBAC | `developer-profiles/dev-profile-base/templates/mlflow-rbac.yaml` | Done — Role + RoleBinding granting the `default` SA `mlflow.kubeflow.org` experiment access in the install namespace (workspace = namespace). Without it RHOAI MLflow returns 403 on span export. |
 | MLflow tracking server | `deploy/helm/observability/helm/mlflow/` | Done — RHOAI MLflow operator CR. |
 
 ### OpenShift platform support

@@ -69,10 +69,11 @@ Installs in order:
 oc get route -n observability-hub -l app.kubernetes.io/name=grafana
 ```
 
-**MLflow:**
+**MLflow:** the RHOAI MLflow operator does not create a Route; the UI is exposed
+via a console link (and reachable in-cluster at the service below). Get the URL:
 
 ```bash
-oc get route -n redhat-ods-applications -l app=mlflow -o jsonpath='{.items[0].spec.host}'
+oc get consolelink -o custom-columns=TEXT:.spec.text,HREF:.spec.href | grep -i mlflow
 ```
 
 ## Chart Details
@@ -137,16 +138,23 @@ Copy this token value.
 
 ### Step 2: Create an MLflow experiment
 
-Get the MLflow URL, open it, and create an experiment to receive traces:
+Get the MLflow UI URL (the operator creates no Route — use the console link):
 
 ```bash
-oc get route -n redhat-ods-applications -l app=mlflow -o jsonpath='{.items[0].spec.host}'
+oc get consolelink -o custom-columns=TEXT:.spec.text,HREF:.spec.href | grep -i mlflow
 ```
 
-1. Click **"+ Create Experiment"**
-2. Enter a **Name** (e.g. `vss-agent-traces`); leave other fields default
-3. Click **"Create"**
-4. Note the numeric **Experiment ID** (`1` if it's your first experiment)
+Open it, then:
+
+1. **Select the workspace matching your install namespace** (e.g. `vss`) in the
+   workspace selector — RHOAI MLflow scopes experiments by workspace, and the agent's
+   SA is only granted access to its own namespace's workspace (see
+   `templates/mlflow-rbac.yaml`). Creating the experiment in any other workspace
+   gives the agent a `403` on export.
+2. Click **"+ Create Experiment"**
+3. Enter a **Name** (e.g. `vss-agent-traces`); leave other fields default
+4. Click **"Create"**
+5. Note the numeric **Experiment ID** from the URL/overview
 
 ### Step 3: Update the config
 
@@ -199,7 +207,10 @@ should appear under the **Traces** tab.
 Traces not appearing? Work through:
 
 1. **Experiment ID matches** — `x-mlflow-experiment-id` in `config.yml` equals the ID in the MLflow UI.
-2. **Token is valid** — re-extract (Step 1); a placeholder or expired token gives `401/403`.
+2. **Token is valid** — re-extract (Step 1); a placeholder or expired token gives `401`.
+3. **`403 PERMISSION_DENIED` on export** — the experiment is in a workspace the agent's SA
+   can't reach. Confirm the experiment was created in the workspace matching your install
+   namespace (Step 2), and that RBAC applied: `oc get rolebinding vss-mlflow-integration -n vss`.
 3. **Check agent logs for OTLP errors:**
 
    ```bash
