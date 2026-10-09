@@ -308,12 +308,12 @@ This quickstart extends the upstream [NVIDIA VSS Blueprint v3.2.1](https://githu
 
 ## License
 
-This AI quickstart is based on the [NVIDIA AI Blueprint: Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization), which is licensed under the **Apache License 2.0**. This repository contains Red Hat-specific customizations and deployment configurations for the upstream VSS project.
+This AI quickstart is based on the [NVIDIA AI Blueprint: Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization), which is licensed under the **Apache License 2.0**. This repository contains Red Hat-specific customizations and deployment configurations for the upstream VSS project, and its custom code is licensed under the **Apache License 2.0**.
 
-- **VSS Project License:** See [licenses/LICENSE](licenses/LICENSE) for the Apache License 2.0 text
+- **Custom code (this repository):** Apache License 2.0 — see [LICENSE](LICENSE)
+- **Upstream VSS blueprint:** See [licenses/LICENSE](licenses/LICENSE) for the upstream project's license and model terms
 - **Third-Party Dependencies:** See [licenses/LICENSE-3rd-party.txt](licenses/LICENSE-3rd-party.txt) for all third-party software licenses
 - **Data License:** See [licenses/LICENSE.DATA](licenses/LICENSE.DATA) for license around use of NVIDIA dataset for evaluations.
-- **AI quickstart Deployment:** See [LICENSE](LICENSE) for license content related to the custom code within this repository.
 
 **Note:** This is not the official NVIDIA VSS Blueprint repository. For the upstream project, see [NVIDIA-AI-Blueprints/video-search-and-summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization).
 
